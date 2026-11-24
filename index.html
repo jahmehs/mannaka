@@ -93,7 +93,7 @@ h1{white-space:nowrap}.topbar{flex-wrap:wrap}.topbar .chips{flex-wrap:nowrap;gap
 </div>
 <script>
 {
-const VERSION="V0.1.009";
+const VERSION="V0.1.010";
 const COLORS=["#ee5a24","#0079c2","#9b7cb6","#00a7db","#e85298","#6cbb5a","#b5a110","#8f2b2b"];
 const GREY="#9aa0a6";
 const PURPOSES={dinner:["Dinner","ディナー","restaurants","レストラン"],cafe:["Café","カフェ","cafe","カフェ"],drinks:["Drinks","飲み","bar","居酒屋"],parking:["Parking","駐車場","parking","駐車場"],meet:["Just meet","待ち合わせ","",""]};
@@ -405,7 +405,7 @@ function drawConv(r){
   const s=$("conv");if(!s)return;
   if(convRO)convRO.disconnect();
   const draw=()=>{
-    const ms=counted(),n=ms.length,W=s.clientWidth||340,R=Math.max(90,Math.min(130,W/2-50)),cx=W/2,cy=0,C=46;
+    const ms=counted(),n=ms.length,W=s.clientWidth||340,R=Math.max(90,Math.min(130,W/2-50)),cx=W/2,cy=0,C=56;
     const byFare=st.mode==="fare"||st.mode==="cheap",val=i=>byFare?r.f[i]:r.t[i],vmax=Math.max(1,...ms.map((p,i)=>val(i)));
     const pts=ms.map((p,i)=>{const a=((n===2?-135:-90+180/n)+i*360/n)*Math.PI/180,L=C+10+(R-C-10)*Math.max(0.3,val(i)/vmax);return {p,i,a,L,x:cx+L*Math.cos(a),y:cy+L*Math.sin(a)}});
     const halo=`paint-order="stroke" stroke="var(--bg)" stroke-width="4" stroke-linejoin="round"`;
@@ -419,11 +419,16 @@ function drawConv(r){
       h+=`<text x="${lx}" y="${ly-2}" text-anchor="${anc}" font-size="13" font-weight="700" fill="${c}" ${halo}>${mins(Math.round(r.t[q.i]))}${q.p.extra?` (+${q.p.extra})`:""}</text>`;
       h+=`<text x="${lx}" y="${ly+13}" text-anchor="${anc}" font-size="13" font-weight="700" fill="${c}" ${halo}>~¥${r.f[q.i]}</text>`;
     }
-    const G=D.groups[r.g],main=LANG==="en"?G[1]:G[0],sub=LANG==="both"?G[1]:"",nm=main.length,fs=LANG==="en"?(nm>10?13:nm>7?15:18):(nm>5?14:nm>3?17:20);
+    const G=D.groups[r.g],main=LANG==="en"?G[1]:G[0],sub=LANG==="both"?G[1]:"",isJ=LANG!=="en",cw=isJ?1.0:0.6,avail=C*1.6;
+    let rows=[main],fs=Math.min(20,avail/(main.length*cw));
+    if(fs<15&&main.length>3){const k=isJ?Math.ceil(main.length/2):(main.lastIndexOf(" ",Math.ceil(main.length/2)+3)>0?main.lastIndexOf(" ",Math.ceil(main.length/2)+3):Math.ceil(main.length/2));rows=[main.slice(0,k).trim(),main.slice(k).trim()];fs=Math.min(18,avail/(Math.max(...rows.map(x=>x.length))*cw))}
+    fs=Math.max(11,Math.floor(fs));
+    const lh=fs+2,extra=(sub?1:0)+1,blockH=rows.length*lh+extra*14,top=cy-blockH/2+fs*0.8;
     h+=`<circle cx="${cx}" cy="${cy}" r="${C}" fill="var(--bg)" stroke="var(--ink)" stroke-width="6"/>`;
-    h+=`<text x="${cx}" y="${cy+(sub?-8:-3)}" text-anchor="middle" font-size="${fs}" font-weight="700" fill="currentColor" font-family="Zen Kaku Gothic New,sans-serif">${esc(main)}</text>`;
-    if(sub)h+=`<text x="${cx}" y="${cy+8}" text-anchor="middle" font-size="11" fill="var(--mut)">${esc(sub.slice(0,12))}</text>`;
-    h+=`<text x="${cx}" y="${cy+(sub?24:17)}" text-anchor="middle" font-size="11.5" fill="var(--mut)">${esc(nLines(G[4].length))}</text>`;
+    rows.forEach((row,k)=>{h+=`<text x="${cx}" y="${top+k*lh}" text-anchor="middle" font-size="${fs}" font-weight="700" fill="currentColor" font-family="Zen Kaku Gothic New,sans-serif">${esc(row)}</text>`});
+    let yy=top+(rows.length-1)*lh+15;
+    if(sub){h+=`<text x="${cx}" y="${yy}" text-anchor="middle" font-size="10.5" fill="var(--mut)">${esc(sub.length>16?sub.slice(0,15)+"…":sub)}</text>`;yy+=14}
+    h+=`<text x="${cx}" y="${yy}" text-anchor="middle" font-size="11" fill="var(--mut)">${esc(nLines(G[4].length))}</text>`;
     for(const q of pts){
       const c=colorOf(q.p.id),P=D.groups[q.p.g],up=Math.sin(q.a)<0.3,ty=up?q.y-30:q.y+24;
       h+=`<circle cx="${q.x}" cy="${q.y}" r="8" fill="var(--bg)" stroke="${c}" stroke-width="4"/>`;

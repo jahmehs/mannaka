@@ -117,7 +117,11 @@ for i, n in enumerate(nodes):
     groups.append(members)
 
 kks = pykakasi.kakasi()
+OVERRIDES = {"高輪ゲートウェイ": "Takanawa Gateway"}
+
 def romaji(s):
+    if s in OVERRIDES:
+        return OVERRIDES[s]
     r = "".join(x["hepburn"] for x in kks.convert(s))
     for a, b in (("ou", "ō"), ("oo", "ō"), ("uu", "ū")):
         r = r.replace(a, b)
