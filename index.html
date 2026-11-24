@@ -74,6 +74,8 @@ h2.q{font-size:24px;margin:4px 0 14px}
 .vdots{display:flex;gap:4px;flex-wrap:wrap}.vdot{width:14px;height:14px;border-radius:50%;border:2px solid var(--bg);box-shadow:0 0 0 1px var(--line)}
 .vote{display:inline-flex;align-items:center;gap:6px;min-height:38px;padding:0 14px;border-radius:19px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:600 14px Inter,"Zen Kaku Gothic New",sans-serif;cursor:pointer}
 .vote.on{background:var(--acc);border-color:var(--acc);color:#fff}
+.arow{display:flex;justify-content:space-between;align-items:center;gap:8px}.arow .voterow{margin-top:0}
+.pickrow{display:flex;align-items:center;gap:10px;cursor:pointer;min-height:40px}.pickrow input{width:22px;height:22px;accent-color:var(--acc);flex:none}.alt.sel{background:var(--accbg);margin:0 -10px;padding:12px 10px;border-radius:12px;border-bottom-color:transparent}
 .chip.sm{min-height:32px;padding:0 10px;font-size:12px}
 .topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
 .st small{font-size:13px}
@@ -88,7 +90,7 @@ h2.q{font-size:24px;margin:4px 0 14px}
 </div>
 <script>
 {
-const VERSION="V0.1.007";
+const VERSION="V0.1.008";
 const COLORS=["#ee5a24","#0079c2","#9b7cb6","#00a7db","#e85298","#6cbb5a","#b5a110","#8f2b2b"];
 const GREY="#9aa0a6";
 const PURPOSES={dinner:["Dinner","ディナー","restaurants","レストラン"],cafe:["Café","カフェ","cafe","カフェ"],drinks:["Drinks","飲み","bar","居酒屋"],parking:["Parking","駐車場","parking","駐車場"],meet:["Just meet","待ち合わせ","",""]};
@@ -126,7 +128,7 @@ const T={
  noneFound:["No connected station found.","つながる駅が見つかりませんでした。"],
  copied:["Copied the invite. Paste it into LINE.","招待をコピーしました。LINEに貼り付けてください。"],sendCode:["Send this code to your friends:","このコードを友だちに送ってください："],
  invite:["Join my Mannaka meetup! Room code:","Mannakaの集まりに参加してね！ルームコード："],
- edit:["Edit","編集"],copy:["Copy","コピー"],codeCopied:["Room code copied","ルームコードをコピーしました"],loading:["Loading station data…","駅データを読み込み中…"],
+ edit:["Edit","編集"],selected:["Selected","選択中"],tapToCompare:["Tick a station to see it in the graphic","駅にチェックを入れると図に表示されます"],copy:["Copy","コピー"],codeCopied:["Room code copied","ルームコードをコピーしました"],loading:["Loading station data…","駅データを読み込み中…"],
  note:["Prototype. About 1,570 Tokyo-area stations. Travel times are estimates from station positions and line speeds, so they can be off by around 20–30%; fares are rough. Rooms use the free ntfy.sh relay: only names, stations and votes are sent, and rooms last about 12 hours. Station data: 国土数値情報 (MLIT).","試作版。首都圏の約1,570駅に対応。所要時間は駅の位置と路線の速度からの推定で、20〜30%ほどずれることがあります。運賃も概算です。ルームは無料の ntfy.sh を使い、送信するのは名前・駅・投票のみ。ルームは約12時間で終了します。駅データ：国土数値情報（国土交通省）"]
 };
 const t=k=>{const v=T[k];if(!v)return k;return LANG==="ja"?v[1]:LANG==="both"?(v[0]===v[1]?v[0]:v[0]+" · "+v[1]):v[0]};
@@ -348,12 +350,12 @@ function compute(){
     if(!ok)continue;
     ms.forEach((p,i)=>t[i]+=p.extra||0);
     const mx=Math.max(...t),mn=Math.min(...t);
-    let sc=mx+0.5*(mx-mn)+(D.groups[g][4].length<2?4:0);
+    let sc=mx+0.5*Math.max(0,mx-mn-5)+(D.groups[g][4].length<2?4:0);
     out.push({g,t,nodes,sc});
   }
   out.sort((a,b)=>a.sc-b.sc);
   let top=out.slice(0,60);
-  top.forEach(r=>{r.f=r.nodes.map((n,i)=>pathFare(runs[i],n));const fx=Math.max(...r.f),fn=Math.min(...r.f);r.fs=fx+0.5*(fx-fn);});
+  top.forEach(r=>{r.f=r.nodes.map((n,i)=>pathFare(runs[i],n));const fx=Math.max(...r.f),fn=Math.min(...r.f);r.fs=fx+0.5*Math.max(0,fx-fn-100);});
   if(st.mode==="fare")top.sort((a,b)=>a.fs-b.fs||a.sc-b.sc);
   if(st.mode==="both")top.sort((a,b)=>(a.sc+a.fs/25)-(b.sc+b.fs/25));
   return top.slice(0,5);
@@ -373,17 +375,24 @@ function voteRow(g){
   const mine=votes[myId]===g;
   return `<div class="voterow"><span class="vdots">${vs.map(p=>`<span class="vdot" style="background:${p.watch?GREY:colorOf(p.id)}" title="${esc(p.name)}"></span>`).join("")}</span><button class="vote${mine?" on":""}" data-v="${g}" aria-pressed="${mine}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 13h16v7H4z"/><path d="M8 13V5h8v8"/><path d="M10 9l1.5 1.5L14 8"/></svg>${mine?t("voted"):t("vote")}</button></div>`;
 }
+let selG=null,lastTop=null;
 function renderResults(){
   const el=$("results"),ms=counted();
   if(ms.length<2){el.innerHTML=`<p class="empty">${t("needTwo")}</p>`;return}
   const R=compute();
   if(!R.length){el.innerHTML=`<p class="empty">${t("noneFound")}</p>`;return}
-  const r=R[0],G=D.groups[r.g];
-  el.innerHTML=`<div class="hero"><div class="toprow"><span class="badge">${t(st.mode==="fare"?"byFare":st.mode==="both"?"overall":"fairest")}</span></div>
+  if(lastTop!==R[0].g){lastTop=R[0].g;selG=R[0].g}
+  if(!R.some(x=>x.g===selG))selG=R[0].g;
+  const r=R.find(x=>x.g===selG),isTop=selG===R[0].g;
+  el.innerHTML=`<div class="hero"><div class="toprow"><span class="badge">${isTop?t(st.mode==="fare"?"byFare":st.mode==="both"?"overall":"fairest"):t("selected")}</span></div>
   ${voteRow(r.g)}
   <div class="fig"><svg id="conv" role="img" aria-label="${esc(stPlain(r.g))}"></svg></div>
-  ${mapLinks(r.g)}</div>`+R.slice(1).map(x=>`<div class="alt"><div class="nm">${stName(x.g)}</div>${voteRow(x.g)}<div class="pills">${ms.map(p=>`<span class="pill" style="box-shadow:inset 3px 0 0 ${colorOf(p.id)}">${esc(p.name)} ${mins(Math.round(x.t[ms.indexOf(p)]))} · ~¥${x.f[ms.indexOf(p)]}</span>`).join("")}</div>${mapLinks(x.g)}</div>`).join("");
-  el.onclick=async e=>{const b=e.target.closest(".vote");if(!b||!myId)return;const g=+b.dataset.v;const ng=votes[myId]===g?-1:g;apply({type:"vote",id:myId,g:ng});renderResults();try{await publish({type:"vote",id:myId,g:ng})}catch(err){$("shareMsg").textContent=t("cantSend")}};
+  ${mapLinks(r.g)}</div>
+  <div class="lbl" style="margin-top:16px">${t("tapToCompare")}</div>`+R.map((x,k)=>{const on=x.g===selG;return `<div class="alt${on?" sel":""}"><div class="arow"><label class="pickrow"><input type="checkbox" class="pk" data-g="${x.g}" ${on?"checked":""}><span class="nm">${stName(x.g)}${k===0?` <span class="badge">${t("fairest")}</span>`:""}</span></label>${voteRow(x.g)}</div><div class="pills">${ms.map((p,i)=>`<span class="pill" style="box-shadow:inset 3px 0 0 ${colorOf(p.id)}">${esc(p.name)} ${mins(Math.round(x.t[i]))} · ~¥${x.f[i]}</span>`).join("")}</div></div>`}).join("");
+  el.onclick=async e=>{
+    const pk=e.target.closest(".pk");
+    if(pk){selG=+pk.dataset.g;renderResults();$("results").scrollIntoView({behavior:"smooth",block:"start"});return}
+    const b=e.target.closest(".vote");if(!b||!myId)return;const g=+b.dataset.v;const ng=votes[myId]===g?-1:g;apply({type:"vote",id:myId,g:ng});renderResults();try{await publish({type:"vote",id:myId,g:ng})}catch(err){$("shareMsg").textContent=t("cantSend")}};
   drawConv(r);
 }
 let convRO=null;
@@ -393,7 +402,7 @@ function drawConv(r){
   const draw=()=>{
     const ms=counted(),n=ms.length,W=s.clientWidth||340,R=Math.max(80,Math.min(120,W/2-55)),H=Math.round(2*R+130),cx=W/2,cy=H/2;
     s.setAttribute("viewBox",`0 0 ${W} ${H}`);s.style.height=H+"px";
-    const pts=ms.map((p,i)=>{const a=((n===2?-90:-90+180/n)+i*360/n)*Math.PI/180;return {p,i,a,x:cx+R*Math.cos(a),y:cy+R*Math.sin(a)}});
+    const pts=ms.map((p,i)=>{const a=((n===2?-135:-90+180/n)+i*360/n)*Math.PI/180;return {p,i,a,x:cx+R*Math.cos(a),y:cy+R*Math.sin(a)}});
     const halo=`paint-order="stroke" stroke="var(--bg)" stroke-width="4" stroke-linejoin="round"`;
     let h=`<circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="var(--line)" stroke-width="1" stroke-dasharray="3 5"/>`;
     for(const q of pts)h+=`<line x1="${q.x}" y1="${q.y}" x2="${cx}" y2="${cy}" stroke="${colorOf(q.p.id)}" stroke-width="6" stroke-linecap="round"/>`;
