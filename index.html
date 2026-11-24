@@ -140,7 +140,7 @@ function renderAdd(){
   document.getElementById("fCancel").onclick=()=>{adding=false;renderAdd()};
   document.getElementById("fOk").onclick=submitAdd;
   q.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();submitAdd()}};
-  drawSugg();
+  if(pick<0)drawSugg();
 }
 function clearErr(){formErr="";const e=document.getElementById("fErr");if(e)e.innerHTML=""}
 function search(q){
@@ -154,7 +154,7 @@ function drawSugg(){
   const ul=document.getElementById("sugg");if(!ul)return;
   const r=search(editQ.trim());
   ul.innerHTML=r.map(i=>{const g=D.groups[i];return `<li><button data-g="${i}" class="${i===pick?"sel":""}">${esc(g[0])} <small>${esc(g[1])} · ${g[4].length} line${g[4].length>1?"s":""}</small></button></li>`}).join("");
-  ul.onclick=e=>{const b=e.target.closest("button");if(!b)return;pick=+b.dataset.g;editQ=D.groups[pick][0];document.getElementById("fSt").value=editQ;drawSugg()};
+  ul.onclick=e=>{const b=e.target.closest("button");if(!b)return;pick=+b.dataset.g;editQ=D.groups[pick][0];const q=document.getElementById("fSt");q.value=editQ;ul.innerHTML="";q.blur();clearErr()};
 }
 function submitAdd(){
   const name=editName.trim();
