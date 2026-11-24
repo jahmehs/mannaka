@@ -76,7 +76,10 @@ h2.q{font-size:24px;margin:4px 0 14px}
 .vote.on{background:var(--acc);border-color:var(--acc);color:#fff}
 .arow{display:flex;justify-content:space-between;align-items:center;gap:8px}.arow .voterow{margin-top:0}
 .pickrow{display:flex;align-items:center;gap:10px;cursor:pointer;min-height:40px}.pickrow input{width:22px;height:22px;accent-color:var(--acc);flex:none}.alt.sel{background:var(--accbg);margin:0 -10px;padding:12px 10px;border-radius:12px;border-bottom-color:transparent}
-.chip.sm{min-height:32px;padding:0 10px;font-size:12px}
+.pn{display:flex;align-items:center;flex-wrap:wrap;gap:4px 6px}.acts{display:inline-flex;align-items:center;gap:2px;margin-left:4px}.acts .plus{margin-left:0;min-height:30px;padding:0 9px}.acts .ed,.acts .x{min-width:34px;min-height:34px;margin:0;font-size:16px}
+.hero .toprow{display:flex;justify-content:space-between;align-items:center}.hero .toprow .voterow{margin-top:0}
+h1{white-space:nowrap}.topbar{flex-wrap:wrap}.topbar .chips{flex-wrap:nowrap;gap:4px}.btn{white-space:nowrap}
+.chip.sm{min-height:30px;padding:0 8px;font-size:12px}
 .topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
 .st small{font-size:13px}
 </style>
@@ -90,11 +93,11 @@ h2.q{font-size:24px;margin:4px 0 14px}
 </div>
 <script>
 {
-const VERSION="V0.1.008";
+const VERSION="V0.1.009";
 const COLORS=["#ee5a24","#0079c2","#9b7cb6","#00a7db","#e85298","#6cbb5a","#b5a110","#8f2b2b"];
 const GREY="#9aa0a6";
 const PURPOSES={dinner:["Dinner","ディナー","restaurants","レストラン"],cafe:["Café","カフェ","cafe","カフェ"],drinks:["Drinks","飲み","bar","居酒屋"],parking:["Parking","駐車場","parking","駐車場"],meet:["Just meet","待ち合わせ","",""]};
-const MODES={time:["Travel time","所要時間"],fare:["Fare","運賃"],both:["Both","両方"]};
+const MODES={time:["Travel time","所要時間"],fare:["Fare","運賃"],both:["Both","両方"],cheap:["Cheapest total","合計最安"],short:["Shortest total","合計最短"]};
 const EXTRAS=[0,5,10,15,20,30];
 const RELAY=location.hostname==="localhost"?"http://127.0.0.1:8799/":"https://ntfy.sh/";
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -128,7 +131,7 @@ const T={
  noneFound:["No connected station found.","つながる駅が見つかりませんでした。"],
  copied:["Copied the invite. Paste it into LINE.","招待をコピーしました。LINEに貼り付けてください。"],sendCode:["Send this code to your friends:","このコードを友だちに送ってください："],
  invite:["Join my Mannaka meetup! Room code:","Mannakaの集まりに参加してね！ルームコード："],
- edit:["Edit","編集"],selected:["Selected","選択中"],tapToCompare:["Tick a station to see it in the graphic","駅にチェックを入れると図に表示されます"],copy:["Copy","コピー"],codeCopied:["Room code copied","ルームコードをコピーしました"],loading:["Loading station data…","駅データを読み込み中…"],
+ edit:["Edit","編集"],cheapest:["Cheapest total","合計最安"],shortest:["Shortest total","合計最短"],total:["Total","合計"],longest:["longest","最長"],selected:["Selected","選択中"],tapToCompare:["Tick a station to see it in the graphic","駅にチェックを入れると図に表示されます"],copy:["Copy","コピー"],codeCopied:["Room code copied","ルームコードをコピーしました"],loading:["Loading station data…","駅データを読み込み中…"],
  note:["Prototype. About 1,570 Tokyo-area stations. Travel times are estimates from station positions and line speeds, so they can be off by around 20–30%; fares are rough. Rooms use the free ntfy.sh relay: only names, stations and votes are sent, and rooms last about 12 hours. Station data: 国土数値情報 (MLIT).","試作版。首都圏の約1,570駅に対応。所要時間は駅の位置と路線の速度からの推定で、20〜30%ほどずれることがあります。運賃も概算です。ルームは無料の ntfy.sh を使い、送信するのは名前・駅・投票のみ。ルームは約12時間で終了します。駅データ：国土数値情報（国土交通省）"]
 };
 const t=k=>{const v=T[k];if(!v)return k;return LANG==="ja"?v[1]:LANG==="both"?(v[0]===v[1]?v[0]:v[0]+" · "+v[1]):v[0]};
@@ -289,7 +292,7 @@ function renderRoom(){
   $("people").innerHTML=ms.map((p,i)=>{
     const c=p.watch?"var(--mut)":colorOf(p.id),ex=p.extra||0;
     const sub=p.watch?t("notCounted"):stName(p.g);
-    const row=`<div class="person"><span class="dot" style="color:${c};background:${p.watch?"transparent":c}"></span><div><div class="pn">${esc(p.name)}${p.id===myId?` <span class="you">${t("you")}</span>`:""}${p.watch?` <span class="badge" style="background:var(--card);color:var(--mut)">${t("viewOnly")}</span>`:""}</div><div class="ps">${sub}</div></div>${p.watch?"":`<button class="plus${ex?" on":""}" data-p="${i}" aria-label="+min ${esc(p.name)}">+${mins(ex)}</button>`}<button class="ed" data-e="${i}" aria-label="${t("edit")} ${esc(p.name)}">✎</button><button class="x" data-i="${i}" aria-label="Remove ${esc(p.name)}">×</button></div>`;
+    const row=`<div class="person"><span class="dot" style="color:${c};background:${p.watch?"transparent":c}"></span><div style="flex:1"><div class="pn">${esc(p.name)}${p.id===myId?` <span class="you">${t("you")}</span>`:""}${p.watch?` <span class="badge" style="background:var(--card);color:var(--mut)">${t("viewOnly")}</span>`:""}<span class="acts">${p.watch?"":`<button class="plus${ex?" on":""}" data-p="${i}" aria-label="+min ${esc(p.name)}">+${mins(ex)}</button>`}<button class="ed" data-e="${i}" aria-label="${t("edit")} ${esc(p.name)}">✎</button><button class="x" data-i="${i}" aria-label="Remove ${esc(p.name)}">×</button></span></div><div class="ps">${sub}</div></div></div>`;
     return row+(editing===p.id?`<div class="form" id="editForm"></div>`:"");
   }).join("");
   if(editing){const p=ms.find(x=>x.id===editing);picker($("editForm"),{askName:true,okLabel:t("save"),init:p,onCancel:()=>{editing=null;renderRoom()},onDone:async q=>{
@@ -353,11 +356,14 @@ function compute(){
     let sc=mx+0.5*Math.max(0,mx-mn-5)+(D.groups[g][4].length<2?4:0);
     out.push({g,t,nodes,sc});
   }
-  out.sort((a,b)=>a.sc-b.sc);
-  let top=out.slice(0,60);
+  const sumT=r=>r.t.reduce((a,b)=>a+b,0);
+  if(st.mode==="short"||st.mode==="cheap")out.sort((a,b)=>sumT(a)-sumT(b));else out.sort((a,b)=>a.sc-b.sc);
+  let top=out.slice(0,st.mode==="cheap"?150:60);
   top.forEach(r=>{r.f=r.nodes.map((n,i)=>pathFare(runs[i],n));const fx=Math.max(...r.f),fn=Math.min(...r.f);r.fs=fx+0.5*Math.max(0,fx-fn-100);});
   if(st.mode==="fare")top.sort((a,b)=>a.fs-b.fs||a.sc-b.sc);
   if(st.mode==="both")top.sort((a,b)=>(a.sc+a.fs/25)-(b.sc+b.fs/25));
+  const sumF=r=>r.f.reduce((a,b)=>a+b,0);
+  if(st.mode==="cheap")top.sort((a,b)=>sumF(a)-sumF(b)||sumT(a)-sumT(b));
   return top.slice(0,5);
 }
 
@@ -384,11 +390,10 @@ function renderResults(){
   if(lastTop!==R[0].g){lastTop=R[0].g;selG=R[0].g}
   if(!R.some(x=>x.g===selG))selG=R[0].g;
   const r=R.find(x=>x.g===selG),isTop=selG===R[0].g;
-  el.innerHTML=`<div class="hero"><div class="toprow"><span class="badge">${isTop?t(st.mode==="fare"?"byFare":st.mode==="both"?"overall":"fairest"):t("selected")}</span></div>
-  ${voteRow(r.g)}
+  el.innerHTML=`<div class="hero"><div class="toprow"><span class="badge">${isTop?t(st.mode==="fare"?"byFare":st.mode==="both"?"overall":st.mode==="cheap"?"cheapest":st.mode==="short"?"shortest":"fairest"):t("selected")}</span>${voteRow(r.g)}</div>
   <div class="fig"><svg id="conv" role="img" aria-label="${esc(stPlain(r.g))}"></svg></div>
   ${mapLinks(r.g)}</div>
-  <div class="lbl" style="margin-top:16px">${t("tapToCompare")}</div>`+R.map((x,k)=>{const on=x.g===selG;return `<div class="alt${on?" sel":""}"><div class="arow"><label class="pickrow"><input type="checkbox" class="pk" data-g="${x.g}" ${on?"checked":""}><span class="nm">${stName(x.g)}${k===0?` <span class="badge">${t("fairest")}</span>`:""}</span></label>${voteRow(x.g)}</div><div class="pills">${ms.map((p,i)=>`<span class="pill" style="box-shadow:inset 3px 0 0 ${colorOf(p.id)}">${esc(p.name)} ${mins(Math.round(x.t[i]))} · ~¥${x.f[i]}</span>`).join("")}</div></div>`}).join("");
+  <div class="lbl" style="margin-top:16px">${t("tapToCompare")}</div>`+R.map((x,k)=>{const on=x.g===selG;return `<div class="alt${on?" sel":""}"><div class="arow"><label class="pickrow"><input type="checkbox" class="pk" data-g="${x.g}" ${on?"checked":""}><span class="nm">${stName(x.g)}${k===0?` <span class="badge">${t(st.mode==="fare"?"byFare":st.mode==="both"?"overall":st.mode==="cheap"?"cheapest":st.mode==="short"?"shortest":"fairest")}</span>`:""}</span></label>${voteRow(x.g)}</div><div class="pills">${ms.map((p,i)=>`<span class="pill" style="box-shadow:inset 3px 0 0 ${colorOf(p.id)}">${esc(p.name)} ${mins(Math.round(x.t[i]))} · ~¥${x.f[i]}</span>`).join("")}</div></div>`}).join("");
   el.onclick=async e=>{
     const pk=e.target.closest(".pk");
     if(pk){selG=+pk.dataset.g;renderResults();$("results").scrollIntoView({behavior:"smooth",block:"start"});return}
@@ -400,24 +405,37 @@ function drawConv(r){
   const s=$("conv");if(!s)return;
   if(convRO)convRO.disconnect();
   const draw=()=>{
-    const ms=counted(),n=ms.length,W=s.clientWidth||340,R=Math.max(80,Math.min(120,W/2-55)),H=Math.round(2*R+130),cx=W/2,cy=H/2;
-    s.setAttribute("viewBox",`0 0 ${W} ${H}`);s.style.height=H+"px";
-    const pts=ms.map((p,i)=>{const a=((n===2?-135:-90+180/n)+i*360/n)*Math.PI/180;return {p,i,a,x:cx+R*Math.cos(a),y:cy+R*Math.sin(a)}});
+    const ms=counted(),n=ms.length,W=s.clientWidth||340,R=Math.max(90,Math.min(130,W/2-50)),cx=W/2,cy=0,C=46;
+    const byFare=st.mode==="fare"||st.mode==="cheap",val=i=>byFare?r.f[i]:r.t[i],vmax=Math.max(1,...ms.map((p,i)=>val(i)));
+    const pts=ms.map((p,i)=>{const a=((n===2?-135:-90+180/n)+i*360/n)*Math.PI/180,L=C+10+(R-C-10)*Math.max(0.3,val(i)/vmax);return {p,i,a,L,x:cx+L*Math.cos(a),y:cy+L*Math.sin(a)}});
     const halo=`paint-order="stroke" stroke="var(--bg)" stroke-width="4" stroke-linejoin="round"`;
-    let h=`<circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="var(--line)" stroke-width="1" stroke-dasharray="3 5"/>`;
+    let h="",minY=-C-8,maxY=C+8;
     for(const q of pts)h+=`<line x1="${q.x}" y1="${q.y}" x2="${cx}" y2="${cy}" stroke="${colorOf(q.p.id)}" stroke-width="6" stroke-linecap="round"/>`;
+    for(const q of pts){
+      const c=colorOf(q.p.id),cos=Math.cos(q.a),sin=Math.sin(q.a);
+      const mx=cx+(C+(q.L-C)*0.55)*cos,my=cy+(C+(q.L-C)*0.55)*sin;
+      let nx=-sin,ny=cos;if(nx<0||(Math.abs(nx)<0.2&&ny<0)){nx=-nx;ny=-ny}
+      const lx=mx+nx*16,ly=my+ny*16,anc=Math.abs(nx)<0.3?"middle":nx>0?"start":"end";
+      h+=`<text x="${lx}" y="${ly-2}" text-anchor="${anc}" font-size="13" font-weight="700" fill="${c}" ${halo}>${mins(Math.round(r.t[q.i]))}${q.p.extra?` (+${q.p.extra})`:""}</text>`;
+      h+=`<text x="${lx}" y="${ly+13}" text-anchor="${anc}" font-size="13" font-weight="700" fill="${c}" ${halo}>~¥${r.f[q.i]}</text>`;
+    }
     const G=D.groups[r.g],main=LANG==="en"?G[1]:G[0],sub=LANG==="both"?G[1]:"",nm=main.length,fs=LANG==="en"?(nm>10?13:nm>7?15:18):(nm>5?14:nm>3?17:20);
-    h+=`<circle cx="${cx}" cy="${cy}" r="46" fill="var(--bg)" stroke="var(--ink)" stroke-width="6"/>`;
+    h+=`<circle cx="${cx}" cy="${cy}" r="${C}" fill="var(--bg)" stroke="var(--ink)" stroke-width="6"/>`;
     h+=`<text x="${cx}" y="${cy+(sub?-8:-3)}" text-anchor="middle" font-size="${fs}" font-weight="700" fill="currentColor" font-family="Zen Kaku Gothic New,sans-serif">${esc(main)}</text>`;
     if(sub)h+=`<text x="${cx}" y="${cy+8}" text-anchor="middle" font-size="11" fill="var(--mut)">${esc(sub.slice(0,12))}</text>`;
     h+=`<text x="${cx}" y="${cy+(sub?24:17)}" text-anchor="middle" font-size="11.5" fill="var(--mut)">${esc(nLines(G[4].length))}</text>`;
     for(const q of pts){
-      const c=colorOf(q.p.id),P=D.groups[q.p.g],up=Math.sin(q.a)<0.3,ty=up?q.y-50:q.y+24;
+      const c=colorOf(q.p.id),P=D.groups[q.p.g],up=Math.sin(q.a)<0.3,ty=up?q.y-30:q.y+24;
       h+=`<circle cx="${q.x}" cy="${q.y}" r="8" fill="var(--bg)" stroke="${c}" stroke-width="4"/>`;
       h+=`<text x="${q.x}" y="${ty}" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor" ${halo}>${esc(q.p.name.slice(0,10))}</text>`;
-      h+=`<text x="${q.x}" y="${ty+16}" text-anchor="middle" font-size="12.5" font-weight="600" fill="${c}" ${halo}>${mins(Math.round(r.t[q.i]))}${q.p.extra?` (+${q.p.extra})`:""} · ~¥${r.f[q.i]}</text>`;
-      h+=`<text x="${q.x}" y="${ty+31}" text-anchor="middle" font-size="12" fill="var(--mut)" ${halo}>${esc((LANG==="en"?P[1]:P[0]).slice(0,10))}</text>`;
+      h+=`<text x="${q.x}" y="${ty+15}" text-anchor="middle" font-size="12" fill="var(--mut)" ${halo}>${esc((LANG==="en"?P[1]:P[0]).slice(0,10))}</text>`;
+      minY=Math.min(minY,up?ty-16:q.y-12);maxY=Math.max(maxY,up?q.y+12:ty+20);
     }
+    const tot=r.f.reduce((a,b)=>a+b,0),lng=Math.round(Math.max(...r.t));
+    const ty=maxY+18;
+    h+=`<text x="${cx}" y="${ty}" text-anchor="middle" font-size="13" fill="var(--mut)">${t("total")} <tspan font-weight="700" fill="currentColor">~¥${tot}</tspan> · ${t("longest")} <tspan font-weight="700" fill="currentColor">${mins(lng)}</tspan></text>`;
+    maxY=ty+8;
+    s.setAttribute("viewBox",`0 ${Math.floor(minY)} ${W} ${Math.ceil(maxY-minY)}`);s.style.height=Math.ceil(maxY-minY)+"px";
     s.innerHTML=h;s.style.color="var(--ink)";
   };
   convRO=new ResizeObserver(draw);convRO.observe(s);draw();
