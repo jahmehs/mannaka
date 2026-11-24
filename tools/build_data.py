@@ -119,9 +119,9 @@ for i, n in enumerate(nodes):
 kks = pykakasi.kakasi()
 def romaji(s):
     r = "".join(x["hepburn"] for x in kks.convert(s))
-    for a, b in (("ou", "o"), ("oo", "o"), ("uu", "u")):
+    for a, b in (("ou", "ō"), ("oo", "ō"), ("uu", "ū")):
         r = r.replace(a, b)
-    return r[:1].upper() + r[1:]
+    return r[:1].upper() + r[1:]  # long vowels shown with macrons (Ōta, Tōkyō)
 
 lines_used = sorted(set(n["line"] for n in nodes))
 li = {l: i for i, l in enumerate(lines_used)}

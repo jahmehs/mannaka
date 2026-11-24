@@ -69,21 +69,30 @@ h2.q{font-size:24px;margin:4px 0 14px}
 .roomhead{display:flex;justify-content:space-between;align-items:center;gap:10px}
 .you{font:500 11px Inter,sans-serif;color:var(--acc-ink);background:var(--accbg);padding:1px 6px;border-radius:8px;vertical-align:2px}
 .btn:disabled{opacity:.6}
+.ed{min-width:40px;min-height:44px;border:0;background:none;color:var(--mut);font-size:17px;cursor:pointer;border-radius:10px}
+.voterow{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px}
+.vdots{display:flex;gap:4px;flex-wrap:wrap}.vdot{width:14px;height:14px;border-radius:50%;border:2px solid var(--bg);box-shadow:0 0 0 1px var(--line)}
+.vote{display:inline-flex;align-items:center;gap:6px;min-height:38px;padding:0 14px;border-radius:19px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:600 14px Inter,"Zen Kaku Gothic New",sans-serif;cursor:pointer}
+.vote.on{background:var(--acc);border-color:var(--acc);color:#fff}
+.chip.sm{min-height:32px;padding:0 10px;font-size:12px}
+.topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.st small{font-size:13px}
 </style>
 </head>
 <body>
 <div class="app">
-  <h1>Mannaka<small>まんなか</small></h1>
-  <p class="tag">Find the fairest station for everyone to meet.</p>
-  <div id="view"><p class="empty">Loading station data…</p></div>
-  <p class="note">Prototype <span id="ver"></span>. About 1,570 Tokyo-area stations. Travel times are estimates from station positions and line speeds, so they can be off by around 20–30%; fares are rough. Rooms use the free ntfy.sh relay: only names and stations are sent, and rooms last about 12 hours. Station data: 国土数値情報 (MLIT).</p>
+  <div class="topbar"><h1>Mannaka<small>まんなか</small></h1><div class="chips" id="lang" aria-label="Language"></div></div>
+  <p class="tag" id="tag"></p>
+  <div id="view"></div>
+  <p class="note" id="note"></p>
 </div>
 <script>
 {
-const VERSION="V0.1.004";
+const VERSION="V0.1.005";
 const COLORS=["#ee5a24","#0079c2","#9b7cb6","#00a7db","#e85298","#6cbb5a","#b5a110","#8f2b2b"];
-const PURPOSES={dinner:["Dinner","restaurants"],cafe:["Café","cafe"],drinks:["Drinks","bar"],parking:["Parking","parking"],meet:["Just meet",""]};
-const MODES={time:"Travel time",fare:"Fare",both:"Both"};
+const GREY="#9aa0a6";
+const PURPOSES={dinner:["Dinner","ディナー","restaurants","レストラン"],cafe:["Café","カフェ","cafe","カフェ"],drinks:["Drinks","飲み","bar","居酒屋"],parking:["Parking","駐車場","parking","駐車場"],meet:["Just meet","待ち合わせ","",""]};
+const MODES={time:["Travel time","所要時間"],fare:["Fare","運賃"],both:["Both","両方"]};
 const EXTRAS=[0,5,10,15,20,30];
 const RELAY=location.hostname==="localhost"?"http://127.0.0.1:8799/":"https://ntfy.sh/";
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -92,20 +101,53 @@ const store={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v)
 const uid=()=>Math.random().toString(36).slice(2,10);
 const $=id=>document.getElementById(id);
 
+/* ---------- language ---------- */
+let LANG=store.get("mk_lang","en");
+const T={
+ tag:["Find the fairest station for everyone to meet.","みんなにとって公平な待ち合わせ駅を探そう。"],
+ host:["Host","ホスト"],hostSub:["Start a meetup and invite friends","集まりを作って友だちを招待"],
+ join:["Join","参加"],joinSub:["Got a room code? Enter it here","ルームコードを持っている人はこちら"],
+ backTo:["Back to room","ルームに戻る"],hosting:["Hosting","ホスト"],joining:["Joining","参加"],
+ yourName:["Your name","あなたの名前"],back:["Back","戻る"],next:["Next","次へ"],nameFirst:["Enter your name first","名前を入力してください"],
+ joiningAs:["Joining as","参加者："],enterCode:["Enter room code","ルームコードを入力"],codeFmt:["Room codes are 8 letters and numbers","ルームコードは8文字の英数字です"],
+ noRoom:["No room with that code. Rooms last about 12 hours.","そのコードのルームはありません。ルームは約12時間で終了します。"],cantCheck:["Couldn't check the code. Check your connection.","コードを確認できませんでした。接続を確認してください。"],
+ from:["Where are you coming from?","どこから来ますか？"],createRoom:["Create room","ルームを作成"],joinRoom:["Join room","ルームに参加"],
+ roomCode:["Room code","ルームコード"],live:["Live","接続中"],reconnecting:["Reconnecting…","再接続中…"],share:["Share","共有"],
+ meetingFor:["Meeting for","目的"],fairBy:["Fair by","公平の基準"],inRoom:["in the room","人が参加中"],you:["you","あなた"],
+ viewOnly:["View only","見るだけ"],notCounted:["View only · not counted","見るだけ・計算に含めない"],viewOnlySub:["See the results without your station being counted","自分の駅を計算に入れずに結果を見る"],
+ addNoPhone:["+ Add someone without a phone","+ スマホがない人を追加"],best:["Best places to meet","おすすめの待ち合わせ駅"],leave:["Leave room","ルームを出る"],
+ name:["Name","名前"],station:["Nearest station (最寄駅)","最寄駅"],stPh:["Shinjuku or 新宿","新宿 または Shinjuku"],
+ extraT:["Extra time to get to the station","駅までの追加時間"],none:["None","なし"],extraSub:["Walking far, a bus or a bike ride before the train","駅まで遠い・バス・自転車など"],
+ cancel:["Cancel","キャンセル"],add:["Add","追加"],save:["Save","保存"],pickSt:["Pick a station from the list","リストから駅を選んでください"],
+ cantReach:["Couldn't reach the room. Check your connection and try again.","ルームに接続できませんでした。もう一度お試しください。"],cantSend:["Couldn't send that change. Check your connection.","変更を送信できませんでした。"],
+ fairest:["Fairest","最も公平"],byFare:["Fairest by fare","運賃が最も公平"],overall:["Fairest overall","総合で最も公平"],
+ line:["line","路線"],lines:["lines","路線"],min:["min","分"],vote:["Vote","投票"],voted:["Voted","投票済み"],
+ needTwo:["Add at least two people with a station to see meeting stations. View-only people don't count.","駅を入れた人が2人以上になると結果が表示されます。「見るだけ」の人は含まれません。"],
+ noneFound:["No connected station found.","つながる駅が見つかりませんでした。"],
+ copied:["Copied the invite. Paste it into LINE.","招待をコピーしました。LINEに貼り付けてください。"],sendCode:["Send this code to your friends:","このコードを友だちに送ってください："],
+ invite:["Join my Mannaka meetup! Room code:","Mannakaの集まりに参加してね！ルームコード："],
+ edit:["Edit","編集"],loading:["Loading station data…","駅データを読み込み中…"],
+ note:["Prototype. About 1,570 Tokyo-area stations. Travel times are estimates from station positions and line speeds, so they can be off by around 20–30%; fares are rough. Rooms use the free ntfy.sh relay: only names, stations and votes are sent, and rooms last about 12 hours. Station data: 国土数値情報 (MLIT).","試作版。首都圏の約1,570駅に対応。所要時間は駅の位置と路線の速度からの推定で、20〜30%ほどずれることがあります。運賃も概算です。ルームは無料の ntfy.sh を使い、送信するのは名前・駅・投票のみ。ルームは約12時間で終了します。駅データ：国土数値情報（国土交通省）"]
+};
+const t=k=>{const v=T[k];if(!v)return k;return LANG==="ja"?v[1]:LANG==="both"?(v[0]===v[1]?v[0]:v[0]+" · "+v[1]):v[0]};
+const pair=a=>LANG==="ja"?a[1]:LANG==="both"?a[0]+" · "+a[1]:a[0];
+const stName=g=>{const G=D.groups[g];return LANG==="ja"?esc(G[0]):LANG==="both"?`${esc(G[0])} <small>${esc(G[1])}</small>`:`${esc(G[1])} <small>${esc(G[0])}</small>`};
+const stPlain=g=>{const G=D.groups[g];return LANG==="ja"?G[0]:LANG==="both"?G[0]+" "+G[1]:G[1]};
+const nLines=n=>LANG==="ja"?`${n}路線`:`${n} ${n>1?T.lines[0]:T.line[0]}`;
+const mins=m=>LANG==="ja"?`${m}分`:`${m} min`;
+
 let D=null,adj=null,groupNodes=null,searchIdx=null;
 let st={purpose:"dinner",mode:"time"};
 let flow={step:"start",role:null,name:store.get("mk_name",""),code:""};
-let room=null,roomMembers=[],es=null,myId=null;
+let room=null,roomMembers=[],votes={},es=null,myId=null,editing=null;
 
 function members(){return roomMembers}
 function counted(){return roomMembers.filter(p=>!p.watch)}
+function colorOf(id){const c=counted(),i=c.findIndex(p=>p.id===id);return i<0?GREY:COLORS[i%COLORS.length]}
 
 /* ---------- relay (ntfy.sh, no accounts) ---------- */
 const topic=c=>"mannaka-"+c.toLowerCase();
-async function publish(obj){
-  const r=await fetch(RELAY+topic(room),{method:"POST",body:JSON.stringify(obj)});
-  if(!r.ok)throw new Error("publish "+r.status);
-}
+async function publish(obj){const r=await fetch(RELAY+topic(room),{method:"POST",body:JSON.stringify(obj)});if(!r.ok)throw new Error("publish "+r.status)}
 function apply(m){
   if(!m||typeof m!=="object")return;
   if(m.type==="member"&&typeof m.id==="string"&&typeof m.name==="string"){
@@ -113,18 +155,15 @@ function apply(m){
     if(!watch&&!(Number.isInteger(g)&&D.groups[g]))return;
     const p={id:m.id.slice(0,12),name:m.name.slice(0,20),g,watch,extra:Number.isFinite(m.extra)?Math.max(0,Math.min(120,Math.round(m.extra))):0,t:+m.t||0};
     const i=roomMembers.findIndex(x=>x.id===p.id);
-    if(i>=0)roomMembers[i]={...roomMembers[i],...p,t:roomMembers[i].t};else roomMembers.push(p);
-  }else if(m.type==="remove"&&typeof m.id==="string"){roomMembers=roomMembers.filter(x=>x.id!==m.id)}
+    if(i>=0)roomMembers[i]={...p,t:roomMembers[i].t};else roomMembers.push(p);
+  }else if(m.type==="remove"&&typeof m.id==="string"){roomMembers=roomMembers.filter(x=>x.id!==m.id);delete votes[m.id]}
   else if(m.type==="meta"){if(PURPOSES[m.purpose])st.purpose=m.purpose;if(MODES[m.mode])st.mode=m.mode}
+  else if(m.type==="vote"&&typeof m.id==="string"){if(Number.isInteger(m.g)&&D.groups[m.g])votes[m.id.slice(0,12)]=m.g;else delete votes[m.id.slice(0,12)]}
 }
 function parseLine(line){try{const o=JSON.parse(line);if(o.event==="message"&&o.message)return JSON.parse(o.message)}catch(e){}return null}
-async function history(code){
-  const r=await fetch(RELAY+topic(code)+"/json?poll=1&since=all");
-  if(!r.ok)throw new Error("poll "+r.status);
-  return (await r.text()).split("\n").filter(Boolean).map(parseLine).filter(Boolean);
-}
+async function history(code){const r=await fetch(RELAY+topic(code)+"/json?poll=1&since=all");if(!r.ok)throw new Error("poll "+r.status);return (await r.text()).split("\n").filter(Boolean).map(parseLine).filter(Boolean)}
 async function enterRoom(code,{create=false,me=null}={}){
-  room=code;roomMembers=[];
+  room=code;roomMembers=[];votes={};
   if(!create){for(const m of await history(code))apply(m)}
   if(create)await publish({type:"meta",purpose:st.purpose,mode:st.mode});
   if(me){myId=me.id;const m={type:"member",...me,t:Date.now()};await publish(m);apply(m)}
@@ -132,12 +171,12 @@ async function enterRoom(code,{create=false,me=null}={}){
   if(es)es.close();
   es=new EventSource(RELAY+topic(code)+"/sse");
   es.onmessage=e=>{const m=parseLine(e.data);if(m){apply(m);if(flow.step==="room")renderRoom()}};
-  es.onerror=()=>{const n=$("live");if(n)n.textContent="Reconnecting…"};
-  es.onopen=()=>{const n=$("live");if(n)n.textContent="Live"};
+  es.onerror=()=>{const n=$("live");if(n)n.textContent=t("reconnecting")};
+  es.onopen=()=>{const n=$("live");if(n)n.textContent=t("live")};
   roomMembers.sort((a,b)=>a.t-b.t);
   flow.step="room";render();
 }
-function leave(){if(es)es.close();es=null;room=null;roomMembers=[];store.set("mk_room",null);flow={step:"start",role:null,name:flow.name,code:""};render()}
+function leave(){if(es)es.close();es=null;room=null;roomMembers=[];votes={};store.set("mk_room",null);flow={step:"start",role:null,name:flow.name,code:""};render()}
 
 /* ---------- station picker ---------- */
 function search(q){
@@ -147,18 +186,21 @@ function search(q){
   const by=(x,y)=>D.groups[y][4].length-D.groups[x][4].length;
   return a.sort(by).concat(b.sort(by)).slice(0,6);
 }
-function picker(el,{askName=false,allowWatch=true,okLabel="Continue",onDone,onCancel}){
-  let pick=-1,extra=0,watch=false;
-  el.innerHTML=`${askName?`<div class="lbl">Name</div><input type="text" id="pName" maxlength="20" placeholder="Ken" autocomplete="off">`:""}
-  ${allowWatch?`<label class="watch"><input type="checkbox" id="pWatch"> <span><b>View only</b><br><small>See the results without your station being counted</small></span></label>`:""}
-  <div id="pSt"><div class="lbl">Nearest station (最寄駅)</div><input type="text" id="pQ" placeholder="Shinjuku or 新宿" autocomplete="off">
+function picker(el,{askName=false,allowWatch=true,okLabel,init={},onDone,onCancel}){
+  let pick=Number.isInteger(init.g)&&init.g>=0?init.g:-1,extra=init.extra||0,watch=!!init.watch;
+  el.innerHTML=`${askName?`<div class="lbl">${t("name")}</div><input type="text" id="pName" maxlength="20" placeholder="Ken" autocomplete="off">`:""}
+  ${allowWatch?`<label class="watch"><input type="checkbox" id="pWatch"> <span><b>${t("viewOnly")}</b><br><small>${t("viewOnlySub")}</small></span></label>`:""}
+  <div id="pSt"><div class="lbl">${t("station")}</div><input type="text" id="pQ" placeholder="${esc(t("stPh"))}" autocomplete="off">
   <ul class="sugg" id="pSugg"></ul>
-  <div class="lbl">Extra time to get to the station</div><div class="chips" id="pEx">${EXTRAS.map(m=>`<button class="chip" data-m="${m}" aria-pressed="${m===0}">${m?"+"+m+" min":"None"}</button>`).join("")}</div>
-  <div class="ps" style="margin-top:4px">Walking far, a bus or a bike ride before the train</div></div>
+  <div class="lbl">${t("extraT")}</div><div class="chips" id="pEx">${EXTRAS.map(m=>`<button class="chip" data-m="${m}" aria-pressed="${m===extra}">${m?"+"+mins(m):t("none")}</button>`).join("")}</div>
+  <div class="ps" style="margin-top:4px">${t("extraSub")}</div></div>
   <div id="pErr"></div>
-  <div class="row" style="margin-top:14px">${onCancel?`<button class="btn" id="pCancel">Cancel</button>`:""}<button class="btn pri" id="pOk">${esc(okLabel)}</button></div>`;
+  <div class="row" style="margin-top:14px">${onCancel?`<button class="btn" id="pCancel">${t("cancel")}</button>`:""}<button class="btn pri" id="pOk">${esc(okLabel)}</button></div>`;
   const q=$("pQ"),ul=$("pSugg"),err=m=>{$("pErr").innerHTML=m?`<div class="err">${esc(m)}</div>`:""};
-  const draw=()=>{const r=search(q.value.trim());ul.innerHTML=r.map(i=>{const g=D.groups[i];return `<li><button data-g="${i}">${esc(g[0])} <small>${esc(g[1])} · ${g[4].length} line${g[4].length>1?"s":""}</small></button></li>`}).join("")};
+  if(askName&&init.name)$("pName").value=init.name;
+  if(pick>=0)q.value=D.groups[pick][0];
+  if(allowWatch){$("pWatch").checked=watch;$("pSt").hidden=watch}
+  const draw=()=>{const r=search(q.value.trim());ul.innerHTML=r.map(i=>{const g=D.groups[i];return `<li><button data-g="${i}">${esc(g[0])} <small>${esc(g[1])} · ${nLines(g[4].length)}</small></button></li>`}).join("")};
   q.oninput=()=>{pick=-1;err("");draw()};
   const choose=e=>{const b=e.target.closest("button[data-g]");if(!b)return;e.preventDefault();pick=+b.dataset.g;q.value=D.groups[pick][0];ul.innerHTML="";err("");setTimeout(()=>q.blur(),0)};
   ul.addEventListener("pointerdown",choose);ul.addEventListener("click",choose);
@@ -167,51 +209,57 @@ function picker(el,{askName=false,allowWatch=true,okLabel="Continue",onDone,onCa
   if(onCancel)$("pCancel").onclick=onCancel;
   const ok=async()=>{
     let name=null;
-    if(askName){name=$("pName").value.trim();if(!name)return err("Enter a name first")}
-    if(!watch&&pick<0){const r=search(q.value.trim());if(r.length&&(D.groups[r[0]][0]===q.value.trim()||norm(D.groups[r[0]][1])===norm(q.value.trim())))pick=r[0];else return err("Pick a station from the list")}
+    if(askName){name=$("pName").value.trim();if(!name)return err(t("nameFirst"))}
+    if(!watch&&pick<0){const r=search(q.value.trim());if(r.length&&(D.groups[r[0]][0]===q.value.trim()||norm(D.groups[r[0]][1])===norm(q.value.trim())))pick=r[0];else return err(t("pickSt"))}
     $("pOk").disabled=true;
-    try{await onDone({name,g:watch?-1:pick,watch,extra:watch?0:extra})}catch(e){err("Couldn't reach the room. Check your connection and try again.");$("pOk").disabled=false}
+    try{await onDone({name,g:watch?-1:pick,watch,extra:watch?0:extra})}catch(e){err(t("cantReach"));const b=$("pOk");if(b)b.disabled=false}
   };
   $("pOk").onclick=ok;q.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();ok()}};
 }
 
 /* ---------- screens ---------- */
 function newCode(){return Array.from({length:8},()=>"ABCDEFGHJKMNPQRSTUVWXYZ23456789"[Math.floor(Math.random()*31)]).join("")}
+function renderChrome(){
+  $("tag").textContent=t("tag");$("note").textContent=`${VERSION} · ${t("note")}`;
+  $("lang").innerHTML=[["en","EN"],["ja","日本語"],["both","EN+日本"]].map(([k,l])=>`<button class="chip sm" data-l="${k}" aria-pressed="${LANG===k}">${l}</button>`).join("");
+}
+$("lang").onclick=e=>{const b=e.target.closest("button");if(!b)return;LANG=b.dataset.l;store.set("mk_lang",LANG);document.documentElement.lang=LANG==="ja"?"ja":"en";renderChrome();if(flow.step==="room"){$("view").innerHTML="";renderRoom()}else render()};
 function render(){
+  renderChrome();
   const v=$("view");
   if(flow.step!=="room"&&es){es.close();es=null}
   if(flow.step==="start"){
     const saved=store.get("mk_room",null);
-    v.innerHTML=`<div class="start"><button class="big pri" id="goHost"><b>Host</b><small>Start a meetup and invite friends</small></button>
-    <button class="big" id="goJoin"><b>Join</b><small>Got a room code? Enter it here</small></button>
-    ${saved?`<button class="btn" id="goBack" style="width:100%;margin-top:6px">Back to room ${esc(saved.code)}</button>`:""}<div id="sErr"></div></div>`;
+    v.innerHTML=`<div class="start"><button class="big pri" id="goHost"><b>${t("host")}</b><small>${t("hostSub")}</small></button>
+    <button class="big" id="goJoin"><b>${t("join")}</b><small>${t("joinSub")}</small></button>
+    ${saved?`<button class="btn" id="goBack" style="width:100%;margin-top:6px">${t("backTo")} ${esc(saved.code)}</button>`:""}<div id="sErr"></div></div>`;
     $("goHost").onclick=()=>{flow.role="host";flow.step="name";render()};
     $("goJoin").onclick=()=>{flow.role="join";flow.step="name";render()};
-    if(saved)$("goBack").onclick=async()=>{try{myId=saved.myId;await enterRoom(saved.code)}catch(e){$("sErr").innerHTML=`<div class="err">Couldn't reach that room</div>`}};
+    if(saved)$("goBack").onclick=async()=>{try{myId=saved.myId;await enterRoom(saved.code)}catch(e){$("sErr").innerHTML=`<div class="err">${t("cantReach")}</div>`}};
   }else if(flow.step==="name"){
-    v.innerHTML=`<div class="stepk">${flow.role==="host"?"Hosting":"Joining"}</div><h2 class="q">Your name</h2>
+    v.innerHTML=`<div class="stepk">${t(flow.role==="host"?"hosting":"joining")}</div><h2 class="q">${t("yourName")}</h2>
     <input type="text" id="nm" maxlength="20" placeholder="Yuki" autocomplete="off"><div id="nErr"></div>
-    <div class="row" style="margin-top:14px"><button class="btn" id="back">Back</button><button class="btn pri" id="next">Next</button></div>`;
+    <div class="row" style="margin-top:14px"><button class="btn" id="back">${t("back")}</button><button class="btn pri" id="next">${t("next")}</button></div>`;
     const n=$("nm");n.value=flow.name;n.focus();
-    const go=()=>{const x=n.value.trim();if(!x){$("nErr").innerHTML=`<div class="err">Enter your name first</div>`;return}flow.name=x;store.set("mk_name",x);flow.step=flow.role==="host"?"station":"code";render()};
+    const go=()=>{const x=n.value.trim();if(!x){$("nErr").innerHTML=`<div class="err">${t("nameFirst")}</div>`;return}flow.name=x;store.set("mk_name",x);flow.step=flow.role==="host"?"station":"code";render()};
     n.oninput=()=>$("nErr").innerHTML="";n.onkeydown=e=>{if(e.key==="Enter")go()};
     $("next").onclick=go;$("back").onclick=()=>{flow.step="start";render()};
   }else if(flow.step==="code"){
-    v.innerHTML=`<div class="stepk">Joining as ${esc(flow.name)}</div><h2 class="q">Enter room code</h2>
+    v.innerHTML=`<div class="stepk">${t("joiningAs")} ${esc(flow.name)}</div><h2 class="q">${t("enterCode")}</h2>
     <input type="text" id="cd" maxlength="8" placeholder="K7QX9P2M" autocapitalize="characters" autocomplete="off" style="font-size:22px;letter-spacing:.15em;text-transform:uppercase"><div id="cErr"></div>
-    <div class="row" style="margin-top:14px"><button class="btn" id="back">Back</button><button class="btn pri" id="next">Next</button></div>`;
+    <div class="row" style="margin-top:14px"><button class="btn" id="back">${t("back")}</button><button class="btn pri" id="next">${t("next")}</button></div>`;
     const c=$("cd");c.value=flow.code;c.focus();
     const go=async()=>{const x=c.value.trim().toUpperCase();const er=m=>$("cErr").innerHTML=`<div class="err">${m}</div>`;
-      if(!/^[A-Z2-9]{8}$/.test(x))return er("Room codes are 8 letters and numbers");
+      if(!/^[A-Z2-9]{8}$/.test(x))return er(t("codeFmt"));
       $("next").disabled=true;
-      try{const h=await history(x);if(!h.length){$("next").disabled=false;return er("No room with that code. Rooms last about 12 hours.")}flow.code=x;flow.step="station";render()}
-      catch(e){$("next").disabled=false;er("Couldn't check the code. Check your connection.")}};
+      try{const h=await history(x);if(!h.length){$("next").disabled=false;return er(t("noRoom"))}flow.code=x;flow.step="station";render()}
+      catch(e){$("next").disabled=false;er(t("cantCheck"))}};
     c.oninput=()=>$("cErr").innerHTML="";c.onkeydown=e=>{if(e.key==="Enter")go()};
     $("next").onclick=go;$("back").onclick=()=>{flow.step="name";render()};
   }else if(flow.step==="station"){
-    v.innerHTML=`<div class="stepk">${flow.role==="host"?"Hosting":"Joining room "+esc(flow.code)} as ${esc(flow.name)}</div><h2 class="q">Where are you coming from?</h2><div id="pk"></div>
-    <button class="btn" id="back" style="width:100%;margin-top:8px">Back</button>`;
-    picker($("pk"),{okLabel:flow.role==="host"?"Create room":"Join room",onDone:async p=>{
+    v.innerHTML=`<div class="stepk">${flow.role==="host"?t("hosting"):t("joining")+" "+esc(flow.code)} · ${esc(flow.name)}</div><h2 class="q">${t("from")}</h2><div id="pk"></div>
+    <button class="btn" id="back" style="width:100%;margin-top:8px">${t("back")}</button>`;
+    picker($("pk"),{okLabel:t(flow.role==="host"?"createRoom":"joinRoom"),onDone:async p=>{
       const me={id:uid(),name:flow.name,g:p.g,watch:p.watch,extra:p.extra};
       if(flow.role==="host")await enterRoom(newCode(),{create:true,me});else await enterRoom(flow.code,{me});
     }});
@@ -222,55 +270,61 @@ function render(){
 function renderRoom(){
   const v=$("view");
   if(!$("roomView")){
-    v.innerHTML=`<div id="roomView"><div class="roomhead"><div><div class="ps">Room code · <span id="live">Live</span></div><div class="code">${esc(room)}</div></div><button class="btn" id="share">Share</button></div>
+    v.innerHTML=`<div id="roomView"><div class="roomhead"><div><div class="ps">${t("roomCode")} · <span id="live">${t("live")}</span></div><div class="code">${esc(room)}</div></div><button class="btn" id="share">${t("share")}</button></div>
     <div class="ps" id="shareMsg" style="min-height:20px"></div>
-    <div class="lbl">Meeting for</div><div class="chips" id="purpose"></div>
-    <div class="lbl">Fair by</div><div class="chips" id="mode"></div>
+    <div class="lbl">${t("meetingFor")}</div><div class="chips" id="purpose"></div>
+    <div class="lbl">${t("fairBy")}</div><div class="chips" id="mode"></div>
     <h2 id="grpTitle"></h2><div id="people"></div>
     <div id="addWrap"></div>
-    <h2>Best places to meet</h2><div id="results"></div>
-    <button class="btn" id="leave" style="width:100%;margin-top:20px">Leave room</button></div>`;
+    <h2>${t("best")}</h2><div id="results"></div>
+    <button class="btn" id="leave" style="width:100%;margin-top:20px">${t("leave")}</button></div>`;
     $("share").onclick=shareRoom;$("leave").onclick=leave;renderAdd(false);
   }
   chips("purpose",PURPOSES,"purpose");chips("mode",MODES,"mode");
   const ms=members();
-  $("grpTitle").textContent=`${ms.length} in the room`;
+  $("grpTitle").textContent=LANG==="ja"?`${ms.length}${t("inRoom")}`:`${ms.length} ${T.inRoom[0]}${LANG==="both"?" · "+ms.length+T.inRoom[1]:""}`;
+  if(editing&&!ms.some(p=>p.id===editing))editing=null;
   $("people").innerHTML=ms.map((p,i)=>{
-    const g=D.groups[p.g],ci=counted().indexOf(p),c=ci<0?"var(--mut)":COLORS[ci%COLORS.length],ex=p.extra||0;
-    const sub=p.watch?"View only · not counted":`${esc(g[0])} · ${esc(g[1])}`;
-    return `<div class="person"><span class="dot" style="color:${c};background:${p.watch?"transparent":c}"></span><div><div class="pn">${esc(p.name)}${p.id===myId?' <span class="you">you</span>':""}${p.watch?' <span class="badge" style="background:var(--card);color:var(--mut)">View only</span>':""}</div><div class="ps">${sub}</div></div>${p.watch?"":`<button class="plus${ex?" on":""}" data-p="${i}" aria-label="Extra minutes for ${esc(p.name)}">+${ex} min</button>`}<button class="x" data-i="${i}" aria-label="Remove ${esc(p.name)}">×</button></div>`}).join("");
+    const c=p.watch?"var(--mut)":colorOf(p.id),ex=p.extra||0;
+    const sub=p.watch?t("notCounted"):stName(p.g);
+    const row=`<div class="person"><span class="dot" style="color:${c};background:${p.watch?"transparent":c}"></span><div><div class="pn">${esc(p.name)}${p.id===myId?` <span class="you">${t("you")}</span>`:""}${p.watch?` <span class="badge" style="background:var(--card);color:var(--mut)">${t("viewOnly")}</span>`:""}</div><div class="ps">${sub}</div></div>${p.watch?"":`<button class="plus${ex?" on":""}" data-p="${i}" aria-label="+min ${esc(p.name)}">+${mins(ex)}</button>`}<button class="ed" data-e="${i}" aria-label="${t("edit")} ${esc(p.name)}">✎</button><button class="x" data-i="${i}" aria-label="Remove ${esc(p.name)}">×</button></div>`;
+    return row+(editing===p.id?`<div class="form" id="editForm"></div>`:"");
+  }).join("");
+  if(editing){const p=ms.find(x=>x.id===editing);picker($("editForm"),{askName:true,okLabel:t("save"),init:p,onCancel:()=>{editing=null;renderRoom()},onDone:async q=>{
+    const m={type:"member",id:p.id,name:q.name,g:q.g,watch:q.watch,extra:q.extra};apply(m);editing=null;renderRoom();await publish(m);
+  }})}
   $("people").onclick=async e=>{
-    const pb=e.target.closest(".plus"),xb=e.target.closest(".x");
+    const pb=e.target.closest(".plus"),xb=e.target.closest(".x"),eb=e.target.closest(".ed");
     try{
-      if(pb){const p=ms[+pb.dataset.p];const nx=EXTRAS[(EXTRAS.indexOf(p.extra||0)+1)%EXTRAS.length];p.extra=nx;renderRoom();await publish({type:"member",id:p.id,name:p.name,g:p.g,watch:p.watch,extra:nx})}
-      if(xb){const p=ms[+xb.dataset.i];roomMembers=roomMembers.filter(x=>x!==p);renderRoom();await publish({type:"remove",id:p.id})}
-    }catch(err){$("shareMsg").textContent="Couldn't send that change. Check your connection."}
+      if(eb){const p=ms[+eb.dataset.e];editing=editing===p.id?null:p.id;renderRoom();return}
+      if(pb){const p=ms[+pb.dataset.p];const nx=EXTRAS[(EXTRAS.indexOf(p.extra||0)+1)%EXTRAS.length];const m={type:"member",id:p.id,name:p.name,g:p.g,watch:p.watch,extra:nx};apply(m);renderRoom();await publish(m)}
+      if(xb){const p=ms[+xb.dataset.i];apply({type:"remove",id:p.id});renderRoom();await publish({type:"remove",id:p.id})}
+    }catch(err){$("shareMsg").textContent=t("cantSend")}
   };
   renderResults();
 }
 function chips(id,obj,key){
   const el=$(id);
-  el.innerHTML=Object.entries(obj).map(([k,v])=>`<button class="chip" data-k="${k}" aria-pressed="${st[key]===k}">${esc(Array.isArray(v)?v[0]:v)}</button>`).join("");
+  el.innerHTML=Object.entries(obj).map(([k,v])=>`<button class="chip" data-k="${k}" aria-pressed="${st[key]===k}">${esc(pair(v))}</button>`).join("");
   el.onclick=async e=>{const b=e.target.closest("button");if(!b)return;st[key]=b.dataset.k;renderRoom();try{await publish({type:"meta",purpose:st.purpose,mode:st.mode})}catch(err){}};
 }
 function renderAdd(open){
   const w=$("addWrap");
-  if(!open){w.innerHTML=`<button class="btn" id="addBtn" style="width:100%;margin-top:10px">+ Add someone without a phone</button>`;$("addBtn").onclick=()=>renderAdd(true);return}
+  if(!open){w.innerHTML=`<button class="btn" id="addBtn" style="width:100%;margin-top:10px">${t("addNoPhone")}</button>`;$("addBtn").onclick=()=>renderAdd(true);return}
   w.innerHTML=`<div class="form" id="addForm"></div>`;
-  picker($("addForm"),{askName:true,okLabel:"Add",onCancel:()=>renderAdd(false),onDone:async p=>{
-    const m={id:uid(),name:p.name,g:p.g,watch:p.watch,extra:p.extra,t:Date.now()};
-    await publish({type:"member",...m});apply({type:"member",...m});renderAdd(false);renderRoom();
+  picker($("addForm"),{askName:true,okLabel:t("add"),onCancel:()=>renderAdd(false),onDone:async p=>{
+    const m={type:"member",id:uid(),name:p.name,g:p.g,watch:p.watch,extra:p.extra,t:Date.now()};
+    await publish(m);apply(m);renderAdd(false);renderRoom();
   }});
 }
 async function shareRoom(){
   const url=location.href.split("#")[0];
-  const text=`Join my Mannaka meetup! Room code: ${room}\n${url}`;
+  const text=`${t("invite")} ${room}\n${url}`;
   try{if(navigator.share){await navigator.share({text});return}}catch(e){if(e.name==="AbortError")return}
-  try{await navigator.clipboard.writeText(text);$("shareMsg").textContent="Copied the invite. Paste it into LINE."}
-  catch(e){$("shareMsg").textContent="Send this code to your friends: "+room}
+  try{await navigator.clipboard.writeText(text);$("shareMsg").textContent=t("copied")}
+  catch(e){$("shareMsg").textContent=t("sendCode")+" "+room}
 }
 
-/* ---------- routing ---------- */
 function heap(){const h=[];return{push(d,n){h.push([d,n]);let i=h.length-1;while(i>0){const p=(i-1)>>1;if(h[p][0]<=h[i][0])break;[h[p],h[i]]=[h[i],h[p]];i=p}},pop(){const t=h[0],l=h.pop();if(h.length){h[0]=l;let i=0;for(;;){let a=2*i+1,b=a+1,m=i;if(a<h.length&&h[a][0]<h[m][0])m=a;if(b<h.length&&h[b][0]<h[m][0])m=b;if(m===i)break;[h[m],h[i]]=[h[i],h[m]];i=m}}return t},get size(){return h.length}}}
 function dijkstra(g){
   const N=D.nodeGroup.length,dist=new Float64Array(N).fill(1e9),prev=new Int32Array(N).fill(-1),pe=new Int32Array(N).fill(-1),H=heap();
@@ -305,57 +359,67 @@ function compute(){
   return top.slice(0,5);
 }
 
+
+
+/* ---------- results ---------- */
 function mapLinks(g){
-  const G=D.groups[g],what=PURPOSES[st.purpose][1];
-  const gq=encodeURIComponent((what?what+" near ":"")+G[0]+"駅");
-  const aq=encodeURIComponent(what||G[0]+"駅");
+  const G=D.groups[g],P=PURPOSES[st.purpose],what=LANG==="ja"?P[3]:P[2];
+  const gq=encodeURIComponent((what?(LANG==="ja"?G[0]+"駅 "+what:what+" near "+G[0]+"駅"):G[0]+"駅"));
+  const aq=encodeURIComponent(P[2]||G[0]+"駅");
   return `<div class="links"><a href="https://www.google.com/maps/search/?api=1&query=${gq}" target="_blank" rel="noopener">Google Maps</a><a href="https://maps.apple.com/?q=${aq}&sll=${G[2]},${G[3]}&z=16" target="_blank" rel="noopener">Apple Maps</a></div>`;
 }
-
+function voteRow(g){
+  const vs=members().filter(p=>votes[p.id]===g);
+  const mine=votes[myId]===g;
+  return `<div class="voterow"><span class="vdots">${vs.map(p=>`<span class="vdot" style="background:${p.watch?GREY:colorOf(p.id)}" title="${esc(p.name)}"></span>`).join("")}</span><button class="vote${mine?" on":""}" data-v="${g}" aria-pressed="${mine}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 13h16v7H4z"/><path d="M8 13V5h8v8"/><path d="M10 9l1.5 1.5L14 8"/></svg>${mine?t("voted"):t("vote")}</button></div>`;
+}
 function renderResults(){
-  const el=document.getElementById("results"),ms=counted();
-  if(ms.length<2){el.innerHTML=`<p class="empty">Add at least two people with a station to see meeting stations. View-only people don't count.</p>`;return}
+  const el=$("results"),ms=counted();
+  if(ms.length<2){el.innerHTML=`<p class="empty">${t("needTwo")}</p>`;return}
   const R=compute();
-  if(!R.length){el.innerHTML=`<p class="empty">No connected station found.</p>`;return}
+  if(!R.length){el.innerHTML=`<p class="empty">${t("noneFound")}</p>`;return}
   const r=R[0],G=D.groups[r.g];
-  el.innerHTML=`<div class="hero"><span class="badge">Fairest${st.mode==="fare"?" by fare":st.mode==="both"?" overall":""}</span>
-  <div class="st">${esc(G[0])}<small>${esc(G[1])} · ${G[4].length} line${G[4].length>1?"s":""}</small></div>
-  <div class="fig"><svg id="conv" role="img" aria-label="Each person's travel time to ${esc(G[1])}"></svg></div>
-  ${mapLinks(r.g)}</div>`+R.slice(1).map(x=>{const g=D.groups[x.g];return `<div class="alt"><div class="nm">${esc(g[0])}<small>${esc(g[1])}</small></div><div class="pills">${ms.map((p,i)=>`<span class="pill" style="box-shadow:inset 3px 0 0 ${COLORS[i%COLORS.length]}">${esc(p.name)} ${Math.round(x.t[i])} min · ~¥${x.f[i]}</span>`).join("")}</div>${mapLinks(x.g)}</div>`}).join("");
+  el.innerHTML=`<div class="hero"><div class="toprow"><span class="badge">${t(st.mode==="fare"?"byFare":st.mode==="both"?"overall":"fairest")}</span></div>
+  <div class="st">${stName(r.g)} <small>· ${nLines(G[4].length)}</small></div>
+  ${voteRow(r.g)}
+  <div class="fig"><svg id="conv" role="img" aria-label="${esc(stPlain(r.g))}"></svg></div>
+  ${mapLinks(r.g)}</div>`+R.slice(1).map(x=>`<div class="alt"><div class="nm">${stName(x.g)}</div>${voteRow(x.g)}<div class="pills">${ms.map(p=>`<span class="pill" style="box-shadow:inset 3px 0 0 ${colorOf(p.id)}">${esc(p.name)} ${mins(Math.round(x.t[ms.indexOf(p)]))} · ~¥${x.f[ms.indexOf(p)]}</span>`).join("")}</div>${mapLinks(x.g)}</div>`).join("");
+  el.onclick=async e=>{const b=e.target.closest(".vote");if(!b||!myId)return;const g=+b.dataset.v;const ng=votes[myId]===g?-1:g;apply({type:"vote",id:myId,g:ng});renderResults();try{await publish({type:"vote",id:myId,g:ng})}catch(err){$("shareMsg").textContent=t("cantSend")}};
   drawConv(r);
 }
-
-let convData=null,convRO=null;
+let convRO=null;
 function drawConv(r){
-  convData=r;const s=document.getElementById("conv");if(!s)return;
+  const s=$("conv");if(!s)return;
   if(convRO)convRO.disconnect();
   const draw=()=>{
-    const ms=counted(),W=s.clientWidth||340,rowH=46,H=Math.max(ms.length*rowH+10,120),cx=W-34,cy=H/2;
+    const ms=counted(),n=ms.length,W=s.clientWidth||340,R=Math.max(58,Math.min(120,W/2-110)),H=Math.round(2*R+(n===2?40:124)),cx=W/2,cy=H/2;
     s.setAttribute("viewBox",`0 0 ${W} ${H}`);s.style.height=H+"px";
-    const lx=W<380?96:120;
-    let h="";
-    ms.forEach((p,i)=>{
-      const y=i*rowH+rowH/2+5,c=COLORS[i%COLORS.length],mx=(lx+cx)/2;
-      h+=`<path d="M${lx} ${y} H${mx-20} C${mx+20} ${y} ${cx-40} ${cy} ${cx-12} ${cy}" fill="none" stroke="${c}" stroke-width="6" stroke-linecap="round"/>`;
-      h+=`<circle cx="${lx}" cy="${y}" r="6" fill="var(--bg)" stroke="${c}" stroke-width="3"/>`;
-      h+=`<text x="${lx-12}" y="${y-3}" text-anchor="end" font-size="14" font-weight="600" fill="currentColor">${esc(p.name.slice(0,10))}</text>`;
-      h+=`<text x="${lx-12}" y="${y+13}" text-anchor="end" font-size="12" fill="var(--mut)">${esc(D.groups[p.g][0].slice(0,7))}</text>`;
-      h+=`<text x="${lx+14}" y="${y-8}" font-size="12.5" font-weight="600" fill="currentColor">${Math.round(r.t[i])} min${p.extra?` (+${p.extra})`:""} · ~¥${r.f[i]}</text>`;
-    });
-    h+=`<circle cx="${cx}" cy="${cy}" r="16" fill="var(--bg)" stroke="var(--ink)" stroke-width="5"/>`;
+    const pts=ms.map((p,i)=>{const a=(-90+180/n+i*360/n)*Math.PI/180;return {p,i,a,x:cx+R*Math.cos(a),y:cy+R*Math.sin(a)}});
+    let h=`<circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="var(--line)" stroke-width="1" stroke-dasharray="3 5"/>`;
+    for(const q of pts)h+=`<line x1="${q.x}" y1="${q.y}" x2="${cx}" y2="${cy}" stroke="${colorOf(q.p.id)}" stroke-width="6" stroke-linecap="round"/>`;
+    h+=`<circle cx="${cx}" cy="${cy}" r="20" fill="var(--bg)" stroke="var(--ink)" stroke-width="6"/>`;
+    for(const q of pts){
+      const c=colorOf(q.p.id),G=D.groups[q.p.g],cos=Math.cos(q.a),sin=Math.sin(q.a);
+      h+=`<circle cx="${q.x}" cy="${q.y}" r="8" fill="var(--bg)" stroke="${c}" stroke-width="4"/>`;
+      let tx=q.x,ty=q.y,anc="middle";
+      if(cos>0.35){anc="start";tx=q.x+14;ty=q.y-14}else if(cos<-0.35){anc="end";tx=q.x-14;ty=q.y-14}else{ty=sin<0?q.y-50:q.y+24}
+      const halo=`paint-order="stroke" stroke="var(--bg)" stroke-width="4" stroke-linejoin="round"`;
+      h+=`<text x="${tx}" y="${ty}" text-anchor="${anc}" font-size="14" font-weight="700" fill="currentColor" ${halo}>${esc(q.p.name.slice(0,10))}</text>`;
+      h+=`<text x="${tx}" y="${ty+16}" text-anchor="${anc}" font-size="12.5" font-weight="600" fill="${c}" ${halo}>${mins(Math.round(r.t[q.i]))}${q.p.extra?` (+${q.p.extra})`:""} · ~¥${r.f[q.i]}</text>`;
+      h+=`<text x="${tx}" y="${ty+31}" text-anchor="${anc}" font-size="12" fill="var(--mut)" ${halo}>${esc((LANG==="en"?G[1]:G[0]).slice(0,10))}</text>`;
+    }
     s.innerHTML=h;s.style.color="var(--ink)";
   };
   convRO=new ResizeObserver(draw);convRO.observe(s);draw();
 }
 
-
-
 /* ---------- boot ---------- */
-$("ver").textContent=VERSION;
+document.documentElement.lang=LANG==="ja"?"ja":"en";
+renderChrome();$("view").innerHTML=`<p class="empty">${t("loading")}</p>`;
 fetch("rail.json").then(r=>r.json()).then(data=>{
   D=data;
   const N=D.nodeGroup.length;adj=Array.from({length:N},()=>[]);
-  D.edges.forEach(([a,b,t,,],i)=>{adj[a].push([b,t,i]);adj[b].push([a,t,i])});
+  D.edges.forEach(([a,b,tt,,],i)=>{adj[a].push([b,tt,i]);adj[b].push([a,tt,i])});
   groupNodes=Array.from({length:D.groups.length},()=>[]);D.nodeGroup.forEach((g,n)=>groupNodes[g].push(n));
   searchIdx=D.groups.map(g=>[g[0],norm(g[1])]);
   render();
