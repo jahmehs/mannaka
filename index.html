@@ -88,7 +88,7 @@ h2.q{font-size:24px;margin:4px 0 14px}
 </div>
 <script>
 {
-const VERSION="V0.1.006";
+const VERSION="V0.1.007";
 const COLORS=["#ee5a24","#0079c2","#9b7cb6","#00a7db","#e85298","#6cbb5a","#b5a110","#8f2b2b"];
 const GREY="#9aa0a6";
 const PURPOSES={dinner:["Dinner","ディナー","restaurants","レストラン"],cafe:["Café","カフェ","cafe","カフェ"],drinks:["Drinks","飲み","bar","居酒屋"],parking:["Parking","駐車場","parking","駐車場"],meet:["Just meet","待ち合わせ","",""]};
@@ -380,7 +380,6 @@ function renderResults(){
   if(!R.length){el.innerHTML=`<p class="empty">${t("noneFound")}</p>`;return}
   const r=R[0],G=D.groups[r.g];
   el.innerHTML=`<div class="hero"><div class="toprow"><span class="badge">${t(st.mode==="fare"?"byFare":st.mode==="both"?"overall":"fairest")}</span></div>
-  <div class="st">${stName(r.g)} <small>· ${nLines(G[4].length)}</small></div>
   ${voteRow(r.g)}
   <div class="fig"><svg id="conv" role="img" aria-label="${esc(stPlain(r.g))}"></svg></div>
   ${mapLinks(r.g)}</div>`+R.slice(1).map(x=>`<div class="alt"><div class="nm">${stName(x.g)}</div>${voteRow(x.g)}<div class="pills">${ms.map(p=>`<span class="pill" style="box-shadow:inset 3px 0 0 ${colorOf(p.id)}">${esc(p.name)} ${mins(Math.round(x.t[ms.indexOf(p)]))} · ~¥${x.f[ms.indexOf(p)]}</span>`).join("")}</div>${mapLinks(x.g)}</div>`).join("");
@@ -392,21 +391,23 @@ function drawConv(r){
   const s=$("conv");if(!s)return;
   if(convRO)convRO.disconnect();
   const draw=()=>{
-    const ms=counted(),n=ms.length,W=s.clientWidth||340,R=Math.max(58,Math.min(120,W/2-110)),H=Math.round(2*R+124),cx=W/2,cy=H/2;
+    const ms=counted(),n=ms.length,W=s.clientWidth||340,R=Math.max(80,Math.min(120,W/2-55)),H=Math.round(2*R+130),cx=W/2,cy=H/2;
     s.setAttribute("viewBox",`0 0 ${W} ${H}`);s.style.height=H+"px";
     const pts=ms.map((p,i)=>{const a=((n===2?-90:-90+180/n)+i*360/n)*Math.PI/180;return {p,i,a,x:cx+R*Math.cos(a),y:cy+R*Math.sin(a)}});
+    const halo=`paint-order="stroke" stroke="var(--bg)" stroke-width="4" stroke-linejoin="round"`;
     let h=`<circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="var(--line)" stroke-width="1" stroke-dasharray="3 5"/>`;
     for(const q of pts)h+=`<line x1="${q.x}" y1="${q.y}" x2="${cx}" y2="${cy}" stroke="${colorOf(q.p.id)}" stroke-width="6" stroke-linecap="round"/>`;
-    h+=`<circle cx="${cx}" cy="${cy}" r="20" fill="var(--bg)" stroke="var(--ink)" stroke-width="6"/>`;
+    const G=D.groups[r.g],main=LANG==="en"?G[1]:G[0],sub=LANG==="both"?G[1]:"",nm=main.length,fs=LANG==="en"?(nm>10?13:nm>7?15:18):(nm>5?14:nm>3?17:20);
+    h+=`<circle cx="${cx}" cy="${cy}" r="46" fill="var(--bg)" stroke="var(--ink)" stroke-width="6"/>`;
+    h+=`<text x="${cx}" y="${cy+(sub?-8:-3)}" text-anchor="middle" font-size="${fs}" font-weight="700" fill="currentColor" font-family="Zen Kaku Gothic New,sans-serif">${esc(main)}</text>`;
+    if(sub)h+=`<text x="${cx}" y="${cy+8}" text-anchor="middle" font-size="11" fill="var(--mut)">${esc(sub.slice(0,12))}</text>`;
+    h+=`<text x="${cx}" y="${cy+(sub?24:17)}" text-anchor="middle" font-size="11.5" fill="var(--mut)">${esc(nLines(G[4].length))}</text>`;
     for(const q of pts){
-      const c=colorOf(q.p.id),G=D.groups[q.p.g],cos=Math.cos(q.a),sin=Math.sin(q.a);
+      const c=colorOf(q.p.id),P=D.groups[q.p.g],up=Math.sin(q.a)<0.3,ty=up?q.y-50:q.y+24;
       h+=`<circle cx="${q.x}" cy="${q.y}" r="8" fill="var(--bg)" stroke="${c}" stroke-width="4"/>`;
-      let tx=q.x,ty=q.y,anc="middle";
-      if(cos>0.35){anc="start";tx=q.x+14;ty=q.y-14}else if(cos<-0.35){anc="end";tx=q.x-14;ty=q.y-14}else{ty=sin<0?q.y-50:q.y+24}
-      const halo=`paint-order="stroke" stroke="var(--bg)" stroke-width="4" stroke-linejoin="round"`;
-      h+=`<text x="${tx}" y="${ty}" text-anchor="${anc}" font-size="14" font-weight="700" fill="currentColor" ${halo}>${esc(q.p.name.slice(0,10))}</text>`;
-      h+=`<text x="${tx}" y="${ty+16}" text-anchor="${anc}" font-size="12.5" font-weight="600" fill="${c}" ${halo}>${mins(Math.round(r.t[q.i]))}${q.p.extra?` (+${q.p.extra})`:""} · ~¥${r.f[q.i]}</text>`;
-      h+=`<text x="${tx}" y="${ty+31}" text-anchor="${anc}" font-size="12" fill="var(--mut)" ${halo}>${esc((LANG==="en"?G[1]:G[0]).slice(0,10))}</text>`;
+      h+=`<text x="${q.x}" y="${ty}" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor" ${halo}>${esc(q.p.name.slice(0,10))}</text>`;
+      h+=`<text x="${q.x}" y="${ty+16}" text-anchor="middle" font-size="12.5" font-weight="600" fill="${c}" ${halo}>${mins(Math.round(r.t[q.i]))}${q.p.extra?` (+${q.p.extra})`:""} · ~¥${r.f[q.i]}</text>`;
+      h+=`<text x="${q.x}" y="${ty+31}" text-anchor="middle" font-size="12" fill="var(--mut)" ${halo}>${esc((LANG==="en"?P[1]:P[0]).slice(0,10))}</text>`;
     }
     s.innerHTML=h;s.style.color="var(--ink)";
   };
