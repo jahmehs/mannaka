@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mannaka – meet in the middle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* VOICE: friendly, clear, like a good station sign
+   IDEA: a subway map where everyone's line runs into one station
+   PICTURE: the live convergence diagram for the fairest station
+   COLOUR and TYPE: white platform, deep ink, signal orange accent, a line colour per person; Zen Kaku Gothic New + Inter
+   LAYOUT: one phone column: group, results, convergence map on top result */
+:root{color-scheme:light dark;--bg:light-dark(#ffffff,#0f1419);--card:light-dark(#f4f5f2,#182028);--ink:light-dark(#141a20,#eef1f3);--mut:light-dark(#5d6670,#9aa5af);--line:light-dark(#dfe2de,#2a343d);--acc:#ee5a24;--acc-ink:light-dark(#b8400f,#ff8a5c);--accbg:light-dark(#fdebe3,#3a2117)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Inter,"Zen Kaku Gothic New",system-ui,sans-serif;overflow-x:clip}
+.app{max-width:460px;margin:0 auto;padding:18px 16px 40px}
+h1{font:700 30px/1.05 "Zen Kaku Gothic New",sans-serif;margin:0;letter-spacing:-.01em}
+h1 small{font-size:15px;color:var(--mut);font-weight:500;margin-left:6px}
+.tag{color:var(--mut);margin:4px 0 18px;font-size:15px}
+h2{font:700 18px/1.2 "Zen Kaku Gothic New",sans-serif;margin:22px 0 10px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{min-height:40px;padding:0 14px;border-radius:20px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:500 14px Inter,sans-serif;cursor:pointer}
+.chip[aria-pressed=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.lbl{font-size:13px;color:var(--mut);margin:12px 0 6px}
+.person{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.dot{width:14px;height:14px;border-radius:50%;flex:none;border:3px solid var(--bg);box-shadow:0 0 0 2px currentColor}
+.pn{font-weight:600}.ps{color:var(--mut);font-size:14px}
+.x{margin-left:auto;min-width:44px;min-height:44px;border:0;background:none;color:var(--mut);font-size:20px;cursor:pointer;border-radius:10px}
+.btn{min-height:46px;padding:0 16px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:600 15px Inter,sans-serif;cursor:pointer}
+.btn.pri{background:var(--acc);border-color:var(--acc);color:#fff}
+.row{display:flex;gap:8px;flex-wrap:wrap}.row>*{flex:1}
+input[type=text]{width:100%;min-height:46px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:16px Inter,"Zen Kaku Gothic New",sans-serif;padding:0 12px}
+input:focus-visible,button:focus-visible,a:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+.form{background:var(--card);border-radius:16px;padding:14px;margin-top:10px}
+.sugg{list-style:none;margin:6px 0 0;padding:0}
+.sugg button{width:100%;text-align:left;min-height:44px;border:0;background:none;color:var(--ink);font:15px Inter,"Zen Kaku Gothic New",sans-serif;padding:6px 8px;border-radius:10px;cursor:pointer}
+.sugg button:hover,.sugg button.sel{background:var(--accbg)}
+.sugg small{color:var(--mut)}
+.err{color:var(--acc-ink);font-size:14px;margin-top:6px}
+.hero{border:2px solid var(--acc);border-radius:18px;padding:14px;margin-top:6px}
+.badge{display:inline-block;background:var(--accbg);color:var(--acc-ink);font:600 12px Inter,sans-serif;padding:3px 10px;border-radius:12px}
+.st{font:700 26px/1.1 "Zen Kaku Gothic New",sans-serif;margin:8px 0 0}
+.st small{font:500 14px Inter,sans-serif;color:var(--mut);margin-left:6px}
+.fig{position:relative;margin:12px 0 4px}
+.fig svg{display:block;width:100%}
+.links{display:flex;gap:8px;margin-top:10px}.links a{flex:1;display:flex;align-items:center;justify-content:center;min-height:44px;border-radius:12px;background:var(--card);color:var(--ink);text-decoration:none;font:600 14px Inter,sans-serif}
+.alt{padding:12px 0;border-bottom:1px solid var(--line)}
+.alt .nm{font:700 17px "Zen Kaku Gothic New",sans-serif}
+.alt .nm small{font:500 13px Inter,sans-serif;color:var(--mut);margin-left:4px}
+.pills{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.pill{font-size:13px;padding:3px 9px;border-radius:10px;background:var(--card);white-space:nowrap}
+.alt .links a{min-height:38px;font-size:13px}
+.room{background:var(--card);border-radius:16px;padding:14px;margin-top:18px}
+.code{font:700 28px/1 "Zen Kaku Gothic New",monospace;letter-spacing:.12em}
+.note{font-size:13px;color:var(--mut);margin-top:22px;line-height:1.5}
+.empty{color:var(--mut);padding:16px 0}
+.plus{margin-left:auto;min-height:36px;padding:0 10px;border-radius:18px;border:1px dashed var(--line);background:none;color:var(--mut);font:500 13px Inter,sans-serif;cursor:pointer;white-space:nowrap}.plus.on{border-style:solid;border-color:var(--acc);color:var(--acc-ink)}.plus+.x{margin-left:0}
+.watch{display:flex;gap:10px;align-items:flex-start;margin:12px 0 2px;cursor:pointer;font-size:15px}.watch input{width:22px;height:22px;margin:2px 0 0;accent-color:var(--acc)}.watch small{color:var(--mut);font-size:13px}.watch b{font-weight:600}[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>Mannaka<small>まんなか</small></h1>
+  <p class="tag">Find the fairest station for everyone to meet.</p>
+
+  <div class="lbl">Meeting for</div>
+  <div class="chips" id="purpose"></div>
+  <div class="lbl">Fair by</div>
+  <div class="chips" id="mode"></div>
+
+  <h2 id="grpTitle">Who's coming</h2>
+  <div id="people"></div>
+  <div id="addWrap"></div>
+
+  <div class="room" id="room"></div>
+
+  <h2>Best places to meet</h2>
+  <div id="results"><p class="empty">Loading station data…</p></div>
+
+  <p class="note">Prototype. Covers about 1,570 stations across the Tokyo area. Travel times are estimates from station positions and line speeds, so they can be off by around 20–30%. Fares are rough estimates. The real app would use full timetables, weekday and holiday schedules and live delay info. Station data: 国土数値情報 (MLIT).</p>
+</div>
+
+<script>
+{
+const COLORS=["#ee5a24","#0079c2","#9b7cb6","#00a7db","#e85298","#6cbb5a","#b5a110","#8f2b2b"];
+const PURPOSES={dinner:["Dinner","restaurants"],cafe:["Café","cafe"],drinks:["Drinks","bar"],parking:["Parking","parking"],meet:["Just meet",""]};
+const MODES={time:"Travel time",fare:"Fare",both:"Both"};
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const norm=s=>s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[\s\-'’]/g,"");
+const store={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+
+let D=null,adj=null,groupNodes=null,searchIdx=null;
+let st=store.get("mannaka",null)||{purpose:"dinner",mode:"time",people:null};
+let room=null,roomMembers=null,db=null,unsubM=null,unsubR=null;
+let adding=false,editName="",editQ="",pick=-1,formErr="",editWatch=false,editExtra=0;
+const EXTRAS=[0,5,10,15,20,30];
+
+function save(){store.set("mannaka",{purpose:st.purpose,mode:st.mode,people:st.people})}
+
+function chips(id,obj,key){
+  const el=document.getElementById(id);
+  el.innerHTML=Object.entries(obj).map(([k,v])=>`<button class="chip" data-k="${k}" aria-pressed="${st[key]===k}">${esc(Array.isArray(v)?v[0]:v)}</button>`).join("");
+  el.onclick=e=>{const b=e.target.closest("button");if(!b)return;st[key]=b.dataset.k;save();if(room)pushMeta();renderAll()};
+}
+
+function members(){return room&&roomMembers?roomMembers:st.people}
+function counted(){return members().filter(p=>!p.watch)}
+
+function renderPeople(){
+  const ms=members();
+  document.getElementById("grpTitle").textContent=room?`Room ${room} · ${ms.length} joined`:"Who's coming";
+  document.getElementById("people").innerHTML=ms.map((p,i)=>{
+    const g=D.groups[p.g],ci=counted().indexOf(p),c=ci<0?"var(--mut)":COLORS[ci%COLORS.length];
+    const ex=p.extra||0;
+    const sub=p.watch?"View only · not in the calculation":`${esc(g[0])} · ${esc(g[1])}`;
+    return `<div class="person"${p.watch?' style="opacity:.85"':""}><span class="dot" style="color:${c};background:${p.watch?"transparent":c}"></span><div><div class="pn">${esc(p.name)}${p.watch?' <span class="badge" style="background:var(--card);color:var(--mut)">View only</span>':""}</div><div class="ps">${sub}</div></div>${p.watch?"":`<button class="plus${ex?" on":""}" data-p="${i}" aria-label="Extra minutes to station for ${esc(p.name)}">+${ex} min</button>`}<button class="x" data-i="${i}" aria-label="Remove ${esc(p.name)}">×</button></div>`}).join("")||`<p class="empty">Add at least two people.</p>`;
+  document.getElementById("people").onclick=e=>{const pb=e.target.closest(".plus");if(pb){cycleExtra(+pb.dataset.p);return}const b=e.target.closest(".x");if(!b)return;removePerson(+b.dataset.i)};
+}
+
+function renderAdd(){
+  const w=document.getElementById("addWrap");
+  if(!adding){w.innerHTML=`<div class="row" style="margin-top:10px"><button class="btn" id="addBtn">+ Add person</button></div>`;document.getElementById("addBtn").onclick=()=>{adding=true;editName="";editQ="";pick=-1;formErr="";editWatch=false;editExtra=0;renderAdd();document.getElementById("fName").focus()};return}
+  w.innerHTML=`<div class="form"><div class="lbl" style="margin-top:0">Name</div><input type="text" id="fName" maxlength="20" placeholder="Aki" autocomplete="off">
+  <label class="watch"><input type="checkbox" id="fWatch"> <span><b>View only</b><br><small>Sees the results, but their station isn't used</small></span></label>
+  <div id="stWrap"><div class="lbl">Nearest station (最寄駅)</div><input type="text" id="fSt" placeholder="Shinjuku or 新宿" autocomplete="off">
+  <ul class="sugg" id="sugg"></ul>
+  <div class="lbl">Extra time to get to the station</div><div class="chips" id="fEx">${EXTRAS.map(m=>`<button class="chip" data-m="${m}" aria-pressed="${editExtra===m}">${m?"+"+m+" min":"None"}</button>`).join("")}</div>
+  <div class="ps" style="margin-top:4px">Walking far, a bus or a bike ride before the train</div></div><div id="fErr"></div>
+  <div class="row" style="margin-top:10px"><button class="btn" id="fCancel">Cancel</button><button class="btn pri" id="fOk">Add</button></div></div>`;
+  const n=document.getElementById("fName"),q=document.getElementById("fSt");
+  n.value=editName;q.value=editQ;
+  const wc=document.getElementById("fWatch"),sw=document.getElementById("stWrap");wc.checked=editWatch;sw.hidden=editWatch;
+  wc.onchange=()=>{editWatch=wc.checked;sw.hidden=editWatch;clearErr()};
+  document.getElementById("fEx").onclick=e=>{const b=e.target.closest("button");if(!b)return;editExtra=+b.dataset.m;for(const x of document.querySelectorAll("#fEx .chip"))x.setAttribute("aria-pressed",x===b)};
+  n.oninput=()=>{editName=n.value;clearErr()};
+  q.oninput=()=>{editQ=q.value;pick=-1;clearErr();drawSugg()};
+  document.getElementById("fCancel").onclick=()=>{adding=false;renderAdd()};
+  document.getElementById("fOk").onclick=submitAdd;
+  q.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();submitAdd()}};
+  drawSugg();
+}
+function clearErr(){formErr="";const e=document.getElementById("fErr");if(e)e.innerHTML=""}
+function search(q){
+  const n=norm(q);if(!n)return[];
+  const a=[],b=[];
+  for(let i=0;i<searchIdx.length;i++){const [jp,ro]=searchIdx[i];if(jp.startsWith(q)||ro.startsWith(n))a.push(i);else if(jp.includes(q)||ro.includes(n))b.push(i)}
+  const by=(x,y)=>D.groups[y][4].length-D.groups[x][4].length;
+  return a.sort(by).concat(b.sort(by)).slice(0,6);
+}
+function drawSugg(){
+  const ul=document.getElementById("sugg");if(!ul)return;
+  const r=search(editQ.trim());
+  ul.innerHTML=r.map(i=>{const g=D.groups[i];return `<li><button data-g="${i}" class="${i===pick?"sel":""}">${esc(g[0])} <small>${esc(g[1])} · ${g[4].length} line${g[4].length>1?"s":""}</small></button></li>`}).join("");
+  ul.onclick=e=>{const b=e.target.closest("button");if(!b)return;pick=+b.dataset.g;editQ=D.groups[pick][0];document.getElementById("fSt").value=editQ;drawSugg()};
+}
+function submitAdd(){
+  const name=editName.trim();
+  let g=pick;
+  if(g<0){const r=search(editQ.trim());if(r.length&&(D.groups[r[0]][0]===editQ.trim()||norm(D.groups[r[0]][1])===norm(editQ.trim())))g=r[0]}
+  const e=document.getElementById("fErr");
+  if(!name){e.innerHTML=`<div class="err">Enter a name first</div>`;return}
+  if(editWatch){if(members().length>=12){e.innerHTML=`<div class="err">Room is full</div>`;return}addPerson({name,g:-1,watch:true});adding=false;renderAdd();return}
+  if(g<0){e.innerHTML=`<div class="err">Pick a station from the list</div>`;return}
+  if(counted().length>=8){e.innerHTML=`<div class="err">Up to 8 people for now</div>`;return}
+  addPerson({name,g,extra:editExtra});adding=false;renderAdd();
+}
+
+async function addPerson(p){
+  if(room){
+    try{const id=Math.random().toString(36).slice(2,10);await db.doc(`rooms/${room}/members/${id}`).set({name:p.name.slice(0,20),g:p.watch?-1:p.g,watch:!!p.watch,extra:p.extra||0,t:Date.now()});const mine=store.get("mine",{});(mine[room]=mine[room]||[]).push(id);store.set("mine",mine)}
+    catch(e){roomMsg("Couldn't add to the room. You may only have view access.")}
+  }else{st.people.push(p);save();renderAll()}
+}
+async function cycleExtra(i){
+  const p=members()[i];const nx=EXTRAS[(EXTRAS.indexOf(p.extra||0)+1)%EXTRAS.length];
+  if(room){try{await db.doc(`rooms/${room}/members/${p.id}`).update({extra:nx})}catch(e){roomMsg("Couldn't change that in the room.")}}
+  else{p.extra=nx;save();renderAll()}
+}
+async function removePerson(i){
+  if(room){const m=roomMembers[i];try{await db.doc(`rooms/${room}/members/${m.id}`).delete()}catch(e){roomMsg("Couldn't remove from the room.")}}
+  else{st.people.splice(i,1);save();renderAll()}
+}
+
+/* ---------- routing ---------- */
+function heap(){const h=[];return{push(d,n){h.push([d,n]);let i=h.length-1;while(i>0){const p=(i-1)>>1;if(h[p][0]<=h[i][0])break;[h[p],h[i]]=[h[i],h[p]];i=p}},pop(){const t=h[0],l=h.pop();if(h.length){h[0]=l;let i=0;for(;;){let a=2*i+1,b=a+1,m=i;if(a<h.length&&h[a][0]<h[m][0])m=a;if(b<h.length&&h[b][0]<h[m][0])m=b;if(m===i)break;[h[m],h[i]]=[h[i],h[m]];i=m}}return t},get size(){return h.length}}}
+function dijkstra(g){
+  const N=D.nodeGroup.length,dist=new Float64Array(N).fill(1e9),prev=new Int32Array(N).fill(-1),pe=new Int32Array(N).fill(-1),H=heap();
+  for(const s of groupNodes[g]){dist[s]=0;H.push(0,s)}
+  while(H.size){const [d,u]=H.pop();if(d>dist[u])continue;for(const [v,w,e] of adj[u]){const nd=d+w;if(nd<dist[v]){dist[v]=nd;prev[v]=u;pe[v]=e;H.push(nd,v)}}}
+  return {dist,prev,pe};
+}
+function fareFor(km){if(km<=0)return 0;if(km<=3)return 170;if(km<=6)return 210;if(km<=10)return 250;if(km<=15)return 300;if(km<=20)return 350;if(km<=25)return 420;if(km<=30)return 490;if(km<=40)return 600;return 600+Math.ceil((km-40)/10)*120}
+function pathFare(R,node){
+  let total=0,op=-2,km=0;
+  for(let u=node;R.prev[u]>=0;u=R.prev[u]){const e=D.edges[R.pe[u]];if(e[4]<0)continue;if(e[4]!==op){total+=fareFor(km);op=e[4];km=0}km+=e[3]}
+  return total+fareFor(km);
+}
+function compute(){
+  const ms=counted();if(ms.length<2)return[];
+  const runs=ms.map(p=>dijkstra(p.g));
+  const out=[];
+  for(let g=0;g<D.groups.length;g++){
+    const t=[],nodes=[];let ok=true;
+    for(const R of runs){let b=1e9,bn=-1;for(const n of groupNodes[g])if(R.dist[n]<b){b=R.dist[n];bn=n}if(b>=1e9){ok=false;break}t.push(b);nodes.push(bn)}
+    if(!ok)continue;
+    ms.forEach((p,i)=>t[i]+=p.extra||0);
+    const mx=Math.max(...t),mn=Math.min(...t);
+    let sc=mx+0.5*(mx-mn)+(D.groups[g][4].length<2?4:0);
+    out.push({g,t,nodes,sc});
+  }
+  out.sort((a,b)=>a.sc-b.sc);
+  let top=out.slice(0,60);
+  top.forEach(r=>{r.f=r.nodes.map((n,i)=>pathFare(runs[i],n));const fx=Math.max(...r.f),fn=Math.min(...r.f);r.fs=fx+0.5*(fx-fn);});
+  if(st.mode==="fare")top.sort((a,b)=>a.fs-b.fs||a.sc-b.sc);
+  if(st.mode==="both")top.sort((a,b)=>(a.sc+a.fs/25)-(b.sc+b.fs/25));
+  return top.slice(0,5);
+}
+
+function mapLinks(g){
+  const G=D.groups[g],what=PURPOSES[st.purpose][1];
+  const gq=encodeURIComponent((what?what+" near ":"")+G[0]+"駅");
+  const aq=encodeURIComponent(what||G[0]+"駅");
+  return `<div class="links"><a href="https://www.google.com/maps/search/?api=1&query=${gq}" target="_blank" rel="noopener">Google Maps</a><a href="https://maps.apple.com/?q=${aq}&sll=${G[2]},${G[3]}&z=16" target="_blank" rel="noopener">Apple Maps</a></div>`;
+}
+
+function renderResults(){
+  const el=document.getElementById("results"),ms=counted();
+  if(ms.length<2){el.innerHTML=`<p class="empty">Add at least two people with a station to see meeting stations. View-only people don't count.</p>`;return}
+  const R=compute();
+  if(!R.length){el.innerHTML=`<p class="empty">No connected station found.</p>`;return}
+  const r=R[0],G=D.groups[r.g];
+  el.innerHTML=`<div class="hero"><span class="badge">Fairest${st.mode==="fare"?" by fare":st.mode==="both"?" overall":""}</span>
+  <div class="st">${esc(G[0])}<small>${esc(G[1])} · ${G[4].length} line${G[4].length>1?"s":""}</small></div>
+  <div class="fig"><svg id="conv" role="img" aria-label="Each person's travel time to ${esc(G[1])}"></svg></div>
+  ${mapLinks(r.g)}</div>`+R.slice(1).map(x=>{const g=D.groups[x.g];return `<div class="alt"><div class="nm">${esc(g[0])}<small>${esc(g[1])}</small></div><div class="pills">${ms.map((p,i)=>`<span class="pill" style="box-shadow:inset 3px 0 0 ${COLORS[i%COLORS.length]}">${esc(p.name)} ${Math.round(x.t[i])} min · ~¥${x.f[i]}</span>`).join("")}</div>${mapLinks(x.g)}</div>`}).join("");
+  drawConv(r);
+}
+
+let convData=null,convRO=null;
+function drawConv(r){
+  convData=r;const s=document.getElementById("conv");if(!s)return;
+  if(convRO)convRO.disconnect();
+  const draw=()=>{
+    const ms=counted(),W=s.clientWidth||340,rowH=46,H=Math.max(ms.length*rowH+10,120),cx=W-34,cy=H/2;
+    s.setAttribute("viewBox",`0 0 ${W} ${H}`);s.style.height=H+"px";
+    const lx=W<380?96:120;
+    let h="";
+    ms.forEach((p,i)=>{
+      const y=i*rowH+rowH/2+5,c=COLORS[i%COLORS.length],mx=(lx+cx)/2;
+      h+=`<path d="M${lx} ${y} H${mx-20} C${mx+20} ${y} ${cx-40} ${cy} ${cx-12} ${cy}" fill="none" stroke="${c}" stroke-width="6" stroke-linecap="round"/>`;
+      h+=`<circle cx="${lx}" cy="${y}" r="6" fill="var(--bg)" stroke="${c}" stroke-width="3"/>`;
+      h+=`<text x="${lx-12}" y="${y-3}" text-anchor="end" font-size="14" font-weight="600" fill="currentColor">${esc(p.name.slice(0,10))}</text>`;
+      h+=`<text x="${lx-12}" y="${y+13}" text-anchor="end" font-size="12" fill="var(--mut)">${esc(D.groups[p.g][0].slice(0,7))}</text>`;
+      h+=`<text x="${lx+14}" y="${y-8}" font-size="12.5" font-weight="600" fill="currentColor">${Math.round(r.t[i])} min${p.extra?` (incl. +${p.extra})`:""} · ~¥${r.f[i]}</text>`;
+    });
+    h+=`<circle cx="${cx}" cy="${cy}" r="16" fill="var(--bg)" stroke="var(--ink)" stroke-width="5"/>`;
+    s.innerHTML=h;s.style.color="var(--ink)";
+  };
+  convRO=new ResizeObserver(draw);convRO.observe(s);draw();
+}
+
+/* ---------- rooms ---------- */
+function roomMsg(m){const e=document.getElementById("roomMsg");if(e)e.textContent=m}
+function renderRoom(){
+  const el=document.getElementById("room");
+  if(!db){el.innerHTML=`<div style="font-weight:600">Invite friends</div><div class="ps" style="margin-top:4px">Shared rooms need you to be signed in to Claude. For now, add everyone on this phone.</div>`;return}
+  if(room){el.innerHTML=`<div class="ps">Room code</div><div class="code">${esc(room)}</div><div class="ps" style="margin:6px 0 10px">Friends open this app, tap “Join room” and enter the code. They can add their station, or join as view only. Everyone sees updates live.</div><div class="row"><button class="btn" id="copyCode">Copy code</button><button class="btn" id="leave">Leave room</button></div><div class="err" id="roomMsg"></div>`;
+    document.getElementById("copyCode").onclick=async()=>{try{await navigator.clipboard.writeText(room);roomMsg("Copied")}catch(e){roomMsg("Copy didn't work here. The code is "+room)}};
+    document.getElementById("leave").onclick=leaveRoom;return}
+  el.innerHTML=`<div style="font-weight:600">Invite friends</div><div class="ps" style="margin:4px 0 10px">Make a room and share the code. Each friend adds their own name and station.</div>
+  <div class="row"><button class="btn pri" id="mk">Make a room</button></div>
+  <div class="row" style="margin-top:8px"><input type="text" id="jc" maxlength="6" placeholder="Room code" autocapitalize="characters" style="flex:2"><button class="btn" id="jn">Join room</button></div><div class="err" id="roomMsg"></div>`;
+  document.getElementById("mk").onclick=makeRoom;
+  document.getElementById("jn").onclick=()=>joinRoom(document.getElementById("jc").value.trim().toUpperCase());
+}
+async function makeRoom(){
+  const code=Array.from({length:6},()=>"ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.floor(Math.random()*32)]).join("");
+  try{
+    await db.doc(`rooms/${code}`).set({purpose:st.purpose,mode:st.mode,created:Date.now()});
+    for(const p of st.people){const id=Math.random().toString(36).slice(2,10);await db.doc(`rooms/${code}/members/${id}`).set({name:p.name,g:p.watch?-1:p.g,watch:!!p.watch,extra:p.extra||0,t:Date.now()})}
+    openRoom(code);
+  }catch(e){roomMsg("Couldn't make a room. Ask the owner for Contributor access.")}
+}
+async function joinRoom(code){
+  if(!/^[A-Z2-9]{6}$/.test(code)){roomMsg("Enter the 6-character code");return}
+  try{const s=await db.doc(`rooms/${code}`).get();if(!s.exists){roomMsg("No room with that code");return}openRoom(code)}catch(e){roomMsg("Couldn't reach the room. Try again.")}
+}
+function openRoom(code){
+  room=code;roomMembers=[];store.set("room",code);
+  let timer=setTimeout(()=>roomMsg("Room is slow to load…"),10000);
+  unsubR=db.doc(`rooms/${code}`).onSnapshot(s=>{const d=s.data();if(d){if(PURPOSES[d.purpose])st.purpose=d.purpose;if(MODES[d.mode])st.mode=d.mode;renderAll()}},()=>{});
+  unsubM=db.collection(`rooms/${code}/members`).orderBy("t").onSnapshot(s=>{
+    clearTimeout(timer);
+    roomMembers=s.docs.map(d=>({id:d.id,...d.data()})).filter(m=>typeof m.name==="string"&&(m.watch===true||(Number.isInteger(m.g)&&D.groups[m.g]))).map(m=>({id:m.id,name:m.name.slice(0,20),g:m.watch===true?-1:m.g,watch:m.watch===true,extra:Number.isFinite(m.extra)?Math.max(0,Math.min(120,Math.round(m.extra))):0}));
+    renderAll();
+  },()=>{clearTimeout(timer);roomMsg("Lost the room connection.")});
+  renderAll();
+}
+function leaveRoom(){if(unsubM)unsubM();if(unsubR)unsubR();room=null;roomMembers=null;store.set("room",null);renderAll()}
+let metaBusy=false;
+async function pushMeta(){if(metaBusy||!room)return;metaBusy=true;try{await db.doc(`rooms/${room}`).update({purpose:st.purpose,mode:st.mode})}catch(e){}metaBusy=false}
+
+function renderAll(){chips("purpose",PURPOSES,"purpose");chips("mode",MODES,"mode");renderPeople();if(!adding)renderAdd();renderRoom();renderResults()}
+
+/* ---------- boot ---------- */
+fetch("rail.json").then(r=>r.json()).then(data=>{
+  D=data;
+  const N=D.nodeGroup.length;adj=Array.from({length:N},()=>[]);
+  D.edges.forEach(([a,b,t,,],i)=>{adj[a].push([b,t,i]);adj[b].push([a,t,i])});
+  groupNodes=Array.from({length:D.groups.length},()=>[]);D.nodeGroup.forEach((g,n)=>groupNodes[g].push(n));
+  searchIdx=D.groups.map(g=>[g[0],norm(g[1])]);
+  if(!st.people){
+    const f=n=>D.groups.findIndex(g=>g[0]===n);
+    st.people=[{name:"You",g:f("吉祥寺")},{name:"Aki",g:f("北千住")},{name:"Ken",g:f("横浜")}].filter(p=>p.g>=0);save();
+  }
+  st.people=st.people.filter(p=>p.watch||D.groups[p.g]);
+  renderAll();
+  let tries=0;const tryDb=()=>{if(window.claude&&window.claude.use){window.claude.use("db").then(x=>{db=x;if(db){const r=store.get("room",null);if(r)joinRoom(r);else renderRoom()}}).catch(()=>{})}else if(++tries<20)setTimeout(tryDb,250)};tryDb();
+}).catch(()=>{document.getElementById("results").innerHTML=`<p class="empty">Couldn't load station data. Reload to try again.</p>`});
+}
+</script>
+</body>
+</html>
