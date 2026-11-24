@@ -10,7 +10,7 @@ Find the fairest train station for a group to meet in the Tokyo area.
 
 ## Status
 
-Prototype. Travel times are **estimates** from station positions and typical line speeds (often 20–30% off); fares are rough. Shared rooms currently only work when the page runs inside Claude (they use Claude's artifact storage); on GitHub Pages the room panel explains this. Next steps: real timetables (ODPT), weekday/holiday schedules, delays, and a Supabase backend for rooms.
+Prototype. Travel times are **estimates** from station positions and typical line speeds (often 20–30% off); fares are rough. Rooms use the free ntfy.sh relay (no accounts needed); rooms last about 12 hours. Next steps: real timetables (ODPT), weekday/holiday schedules, delays, and a Supabase backend for rooms.
 
 ## Data
 

@@ -59,90 +59,87 @@ input:focus-visible,button:focus-visible,a:focus-visible{outline:3px solid var(-
 .empty{color:var(--mut);padding:16px 0}
 .plus{margin-left:auto;min-height:36px;padding:0 10px;border-radius:18px;border:1px dashed var(--line);background:none;color:var(--mut);font:500 13px Inter,sans-serif;cursor:pointer;white-space:nowrap}.plus.on{border-style:solid;border-color:var(--acc);color:var(--acc-ink)}.plus+.x{margin-left:0}
 .watch{display:flex;gap:10px;align-items:flex-start;margin:12px 0 2px;cursor:pointer;font-size:15px}.watch input{width:22px;height:22px;margin:2px 0 0;accent-color:var(--acc)}.watch small{color:var(--mut);font-size:13px}.watch b{font-weight:600}[hidden]{display:none!important}
+
+.start{display:grid;gap:12px;margin-top:8px}
+.big{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-height:96px;padding:18px 20px;border-radius:18px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;text-align:left}
+.big b{font:700 24px "Zen Kaku Gothic New",sans-serif}.big small{font-size:14px;color:var(--mut)}
+.big.pri{background:var(--acc);border-color:var(--acc);color:#fff}.big.pri small{color:#ffe3d6}
+.stepk{font-size:13px;color:var(--mut);margin-top:8px}
+h2.q{font-size:24px;margin:4px 0 14px}
+.roomhead{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.you{font:500 11px Inter,sans-serif;color:var(--acc-ink);background:var(--accbg);padding:1px 6px;border-radius:8px;vertical-align:2px}
+.btn:disabled{opacity:.6}
 </style>
 </head>
 <body>
 <div class="app">
   <h1>Mannaka<small>まんなか</small></h1>
   <p class="tag">Find the fairest station for everyone to meet.</p>
-
-  <div class="lbl">Meeting for</div>
-  <div class="chips" id="purpose"></div>
-  <div class="lbl">Fair by</div>
-  <div class="chips" id="mode"></div>
-
-  <h2 id="grpTitle">Who's coming</h2>
-  <div id="people"></div>
-  <div id="addWrap"></div>
-
-  <div class="room" id="room"></div>
-
-  <h2>Best places to meet</h2>
-  <div id="results"><p class="empty">Loading station data…</p></div>
-
-  <p class="note">Prototype. Covers about 1,570 stations across the Tokyo area. Travel times are estimates from station positions and line speeds, so they can be off by around 20–30%. Fares are rough estimates. The real app would use full timetables, weekday and holiday schedules and live delay info. Station data: 国土数値情報 (MLIT).</p>
+  <div id="view"><p class="empty">Loading station data…</p></div>
+  <p class="note">Prototype <span id="ver"></span>. About 1,570 Tokyo-area stations. Travel times are estimates from station positions and line speeds, so they can be off by around 20–30%; fares are rough. Rooms use the free ntfy.sh relay: only names and stations are sent, and rooms last about 12 hours. Station data: 国土数値情報 (MLIT).</p>
 </div>
-
 <script>
 {
+const VERSION="V0.1.004";
 const COLORS=["#ee5a24","#0079c2","#9b7cb6","#00a7db","#e85298","#6cbb5a","#b5a110","#8f2b2b"];
 const PURPOSES={dinner:["Dinner","restaurants"],cafe:["Café","cafe"],drinks:["Drinks","bar"],parking:["Parking","parking"],meet:["Just meet",""]};
 const MODES={time:"Travel time",fare:"Fare",both:"Both"};
+const EXTRAS=[0,5,10,15,20,30];
+const RELAY=location.hostname==="localhost"?"http://127.0.0.1:8799/":"https://ntfy.sh/";
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const norm=s=>s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[\s\-'’]/g,"");
 const store={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+const uid=()=>Math.random().toString(36).slice(2,10);
+const $=id=>document.getElementById(id);
 
 let D=null,adj=null,groupNodes=null,searchIdx=null;
-let st=store.get("mannaka",null)||{purpose:"dinner",mode:"time",people:null};
-let room=null,roomMembers=null,db=null,unsubM=null,unsubR=null;
-let adding=false,editName="",editQ="",pick=-1,formErr="",editWatch=false,editExtra=0;
-const EXTRAS=[0,5,10,15,20,30];
+let st={purpose:"dinner",mode:"time"};
+let flow={step:"start",role:null,name:store.get("mk_name",""),code:""};
+let room=null,roomMembers=[],es=null,myId=null;
 
-function save(){store.set("mannaka",{purpose:st.purpose,mode:st.mode,people:st.people})}
+function members(){return roomMembers}
+function counted(){return roomMembers.filter(p=>!p.watch)}
 
-function chips(id,obj,key){
-  const el=document.getElementById(id);
-  el.innerHTML=Object.entries(obj).map(([k,v])=>`<button class="chip" data-k="${k}" aria-pressed="${st[key]===k}">${esc(Array.isArray(v)?v[0]:v)}</button>`).join("");
-  el.onclick=e=>{const b=e.target.closest("button");if(!b)return;st[key]=b.dataset.k;save();if(room)pushMeta();renderAll()};
+/* ---------- relay (ntfy.sh, no accounts) ---------- */
+const topic=c=>"mannaka-"+c.toLowerCase();
+async function publish(obj){
+  const r=await fetch(RELAY+topic(room),{method:"POST",body:JSON.stringify(obj)});
+  if(!r.ok)throw new Error("publish "+r.status);
 }
-
-function members(){return room&&roomMembers?roomMembers:st.people}
-function counted(){return members().filter(p=>!p.watch)}
-
-function renderPeople(){
-  const ms=members();
-  document.getElementById("grpTitle").textContent=room?`Room ${room} · ${ms.length} joined`:"Who's coming";
-  document.getElementById("people").innerHTML=ms.map((p,i)=>{
-    const g=D.groups[p.g],ci=counted().indexOf(p),c=ci<0?"var(--mut)":COLORS[ci%COLORS.length];
-    const ex=p.extra||0;
-    const sub=p.watch?"View only · not in the calculation":`${esc(g[0])} · ${esc(g[1])}`;
-    return `<div class="person"${p.watch?' style="opacity:.85"':""}><span class="dot" style="color:${c};background:${p.watch?"transparent":c}"></span><div><div class="pn">${esc(p.name)}${p.watch?' <span class="badge" style="background:var(--card);color:var(--mut)">View only</span>':""}</div><div class="ps">${sub}</div></div>${p.watch?"":`<button class="plus${ex?" on":""}" data-p="${i}" aria-label="Extra minutes to station for ${esc(p.name)}">+${ex} min</button>`}<button class="x" data-i="${i}" aria-label="Remove ${esc(p.name)}">×</button></div>`}).join("")||`<p class="empty">Add at least two people.</p>`;
-  document.getElementById("people").onclick=e=>{const pb=e.target.closest(".plus");if(pb){cycleExtra(+pb.dataset.p);return}const b=e.target.closest(".x");if(!b)return;removePerson(+b.dataset.i)};
+function apply(m){
+  if(!m||typeof m!=="object")return;
+  if(m.type==="member"&&typeof m.id==="string"&&typeof m.name==="string"){
+    const watch=m.watch===true,g=watch?-1:m.g;
+    if(!watch&&!(Number.isInteger(g)&&D.groups[g]))return;
+    const p={id:m.id.slice(0,12),name:m.name.slice(0,20),g,watch,extra:Number.isFinite(m.extra)?Math.max(0,Math.min(120,Math.round(m.extra))):0,t:+m.t||0};
+    const i=roomMembers.findIndex(x=>x.id===p.id);
+    if(i>=0)roomMembers[i]={...roomMembers[i],...p,t:roomMembers[i].t};else roomMembers.push(p);
+  }else if(m.type==="remove"&&typeof m.id==="string"){roomMembers=roomMembers.filter(x=>x.id!==m.id)}
+  else if(m.type==="meta"){if(PURPOSES[m.purpose])st.purpose=m.purpose;if(MODES[m.mode])st.mode=m.mode}
 }
-
-function renderAdd(){
-  const w=document.getElementById("addWrap");
-  if(!adding){w.innerHTML=`<div class="row" style="margin-top:10px"><button class="btn" id="addBtn">+ Add person</button></div>`;document.getElementById("addBtn").onclick=()=>{adding=true;editName="";editQ="";pick=-1;formErr="";editWatch=false;editExtra=0;renderAdd();document.getElementById("fName").focus()};return}
-  w.innerHTML=`<div class="form"><div class="lbl" style="margin-top:0">Name</div><input type="text" id="fName" maxlength="20" placeholder="Aki" autocomplete="off">
-  <label class="watch"><input type="checkbox" id="fWatch"> <span><b>View only</b><br><small>Sees the results, but their station isn't used</small></span></label>
-  <div id="stWrap"><div class="lbl">Nearest station (最寄駅)</div><input type="text" id="fSt" placeholder="Shinjuku or 新宿" autocomplete="off">
-  <ul class="sugg" id="sugg"></ul>
-  <div class="lbl">Extra time to get to the station</div><div class="chips" id="fEx">${EXTRAS.map(m=>`<button class="chip" data-m="${m}" aria-pressed="${editExtra===m}">${m?"+"+m+" min":"None"}</button>`).join("")}</div>
-  <div class="ps" style="margin-top:4px">Walking far, a bus or a bike ride before the train</div></div><div id="fErr"></div>
-  <div class="row" style="margin-top:10px"><button class="btn" id="fCancel">Cancel</button><button class="btn pri" id="fOk">Add</button></div></div>`;
-  const n=document.getElementById("fName"),q=document.getElementById("fSt");
-  n.value=editName;q.value=editQ;
-  const wc=document.getElementById("fWatch"),sw=document.getElementById("stWrap");wc.checked=editWatch;sw.hidden=editWatch;
-  wc.onchange=()=>{editWatch=wc.checked;sw.hidden=editWatch;clearErr()};
-  document.getElementById("fEx").onclick=e=>{const b=e.target.closest("button");if(!b)return;editExtra=+b.dataset.m;for(const x of document.querySelectorAll("#fEx .chip"))x.setAttribute("aria-pressed",x===b)};
-  n.oninput=()=>{editName=n.value;clearErr()};
-  q.oninput=()=>{editQ=q.value;pick=-1;clearErr();drawSugg()};
-  document.getElementById("fCancel").onclick=()=>{adding=false;renderAdd()};
-  document.getElementById("fOk").onclick=submitAdd;
-  q.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();submitAdd()}};
-  if(pick<0)drawSugg();
+function parseLine(line){try{const o=JSON.parse(line);if(o.event==="message"&&o.message)return JSON.parse(o.message)}catch(e){}return null}
+async function history(code){
+  const r=await fetch(RELAY+topic(code)+"/json?poll=1&since=all");
+  if(!r.ok)throw new Error("poll "+r.status);
+  return (await r.text()).split("\n").filter(Boolean).map(parseLine).filter(Boolean);
 }
-function clearErr(){formErr="";const e=document.getElementById("fErr");if(e)e.innerHTML=""}
+async function enterRoom(code,{create=false,me=null}={}){
+  room=code;roomMembers=[];
+  if(!create){for(const m of await history(code))apply(m)}
+  if(create)await publish({type:"meta",purpose:st.purpose,mode:st.mode});
+  if(me){myId=me.id;const m={type:"member",...me,t:Date.now()};await publish(m);apply(m)}
+  store.set("mk_room",{code,myId});
+  if(es)es.close();
+  es=new EventSource(RELAY+topic(code)+"/sse");
+  es.onmessage=e=>{const m=parseLine(e.data);if(m){apply(m);if(flow.step==="room")renderRoom()}};
+  es.onerror=()=>{const n=$("live");if(n)n.textContent="Reconnecting…"};
+  es.onopen=()=>{const n=$("live");if(n)n.textContent="Live"};
+  roomMembers.sort((a,b)=>a.t-b.t);
+  flow.step="room";render();
+}
+function leave(){if(es)es.close();es=null;room=null;roomMembers=[];store.set("mk_room",null);flow={step:"start",role:null,name:flow.name,code:""};render()}
+
+/* ---------- station picker ---------- */
 function search(q){
   const n=norm(q);if(!n)return[];
   const a=[],b=[];
@@ -150,38 +147,127 @@ function search(q){
   const by=(x,y)=>D.groups[y][4].length-D.groups[x][4].length;
   return a.sort(by).concat(b.sort(by)).slice(0,6);
 }
-function drawSugg(){
-  const ul=document.getElementById("sugg");if(!ul)return;
-  const r=search(editQ.trim());
-  ul.innerHTML=r.map(i=>{const g=D.groups[i];return `<li><button data-g="${i}" class="${i===pick?"sel":""}">${esc(g[0])} <small>${esc(g[1])} · ${g[4].length} line${g[4].length>1?"s":""}</small></button></li>`}).join("");
-  ul.onclick=e=>{const b=e.target.closest("button");if(!b)return;pick=+b.dataset.g;editQ=D.groups[pick][0];const q=document.getElementById("fSt");q.value=editQ;ul.innerHTML="";q.blur();clearErr()};
-}
-function submitAdd(){
-  const name=editName.trim();
-  let g=pick;
-  if(g<0){const r=search(editQ.trim());if(r.length&&(D.groups[r[0]][0]===editQ.trim()||norm(D.groups[r[0]][1])===norm(editQ.trim())))g=r[0]}
-  const e=document.getElementById("fErr");
-  if(!name){e.innerHTML=`<div class="err">Enter a name first</div>`;return}
-  if(editWatch){if(members().length>=12){e.innerHTML=`<div class="err">Room is full</div>`;return}addPerson({name,g:-1,watch:true});adding=false;renderAdd();return}
-  if(g<0){e.innerHTML=`<div class="err">Pick a station from the list</div>`;return}
-  if(counted().length>=8){e.innerHTML=`<div class="err">Up to 8 people for now</div>`;return}
-  addPerson({name,g,extra:editExtra});adding=false;renderAdd();
+function picker(el,{askName=false,allowWatch=true,okLabel="Continue",onDone,onCancel}){
+  let pick=-1,extra=0,watch=false;
+  el.innerHTML=`${askName?`<div class="lbl">Name</div><input type="text" id="pName" maxlength="20" placeholder="Ken" autocomplete="off">`:""}
+  ${allowWatch?`<label class="watch"><input type="checkbox" id="pWatch"> <span><b>View only</b><br><small>See the results without your station being counted</small></span></label>`:""}
+  <div id="pSt"><div class="lbl">Nearest station (最寄駅)</div><input type="text" id="pQ" placeholder="Shinjuku or 新宿" autocomplete="off">
+  <ul class="sugg" id="pSugg"></ul>
+  <div class="lbl">Extra time to get to the station</div><div class="chips" id="pEx">${EXTRAS.map(m=>`<button class="chip" data-m="${m}" aria-pressed="${m===0}">${m?"+"+m+" min":"None"}</button>`).join("")}</div>
+  <div class="ps" style="margin-top:4px">Walking far, a bus or a bike ride before the train</div></div>
+  <div id="pErr"></div>
+  <div class="row" style="margin-top:14px">${onCancel?`<button class="btn" id="pCancel">Cancel</button>`:""}<button class="btn pri" id="pOk">${esc(okLabel)}</button></div>`;
+  const q=$("pQ"),ul=$("pSugg"),err=m=>{$("pErr").innerHTML=m?`<div class="err">${esc(m)}</div>`:""};
+  const draw=()=>{const r=search(q.value.trim());ul.innerHTML=r.map(i=>{const g=D.groups[i];return `<li><button data-g="${i}">${esc(g[0])} <small>${esc(g[1])} · ${g[4].length} line${g[4].length>1?"s":""}</small></button></li>`}).join("")};
+  q.oninput=()=>{pick=-1;err("");draw()};
+  const choose=e=>{const b=e.target.closest("button[data-g]");if(!b)return;e.preventDefault();pick=+b.dataset.g;q.value=D.groups[pick][0];ul.innerHTML="";err("");setTimeout(()=>q.blur(),0)};
+  ul.addEventListener("pointerdown",choose);ul.addEventListener("click",choose);
+  $("pEx").onclick=e=>{const b=e.target.closest("button");if(!b)return;extra=+b.dataset.m;for(const x of el.querySelectorAll("#pEx .chip"))x.setAttribute("aria-pressed",x===b)};
+  if(allowWatch)$("pWatch").onchange=e=>{watch=e.target.checked;$("pSt").hidden=watch;err("")};
+  if(onCancel)$("pCancel").onclick=onCancel;
+  const ok=async()=>{
+    let name=null;
+    if(askName){name=$("pName").value.trim();if(!name)return err("Enter a name first")}
+    if(!watch&&pick<0){const r=search(q.value.trim());if(r.length&&(D.groups[r[0]][0]===q.value.trim()||norm(D.groups[r[0]][1])===norm(q.value.trim())))pick=r[0];else return err("Pick a station from the list")}
+    $("pOk").disabled=true;
+    try{await onDone({name,g:watch?-1:pick,watch,extra:watch?0:extra})}catch(e){err("Couldn't reach the room. Check your connection and try again.");$("pOk").disabled=false}
+  };
+  $("pOk").onclick=ok;q.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();ok()}};
 }
 
-async function addPerson(p){
-  if(room){
-    try{const id=Math.random().toString(36).slice(2,10);await db.doc(`rooms/${room}/members/${id}`).set({name:p.name.slice(0,20),g:p.watch?-1:p.g,watch:!!p.watch,extra:p.extra||0,t:Date.now()});const mine=store.get("mine",{});(mine[room]=mine[room]||[]).push(id);store.set("mine",mine)}
-    catch(e){roomMsg("Couldn't add to the room. You may only have view access.")}
-  }else{st.people.push(p);save();renderAll()}
+/* ---------- screens ---------- */
+function newCode(){return Array.from({length:8},()=>"ABCDEFGHJKMNPQRSTUVWXYZ23456789"[Math.floor(Math.random()*31)]).join("")}
+function render(){
+  const v=$("view");
+  if(flow.step!=="room"&&es){es.close();es=null}
+  if(flow.step==="start"){
+    const saved=store.get("mk_room",null);
+    v.innerHTML=`<div class="start"><button class="big pri" id="goHost"><b>Host</b><small>Start a meetup and invite friends</small></button>
+    <button class="big" id="goJoin"><b>Join</b><small>Got a room code? Enter it here</small></button>
+    ${saved?`<button class="btn" id="goBack" style="width:100%;margin-top:6px">Back to room ${esc(saved.code)}</button>`:""}<div id="sErr"></div></div>`;
+    $("goHost").onclick=()=>{flow.role="host";flow.step="name";render()};
+    $("goJoin").onclick=()=>{flow.role="join";flow.step="name";render()};
+    if(saved)$("goBack").onclick=async()=>{try{myId=saved.myId;await enterRoom(saved.code)}catch(e){$("sErr").innerHTML=`<div class="err">Couldn't reach that room</div>`}};
+  }else if(flow.step==="name"){
+    v.innerHTML=`<div class="stepk">${flow.role==="host"?"Hosting":"Joining"}</div><h2 class="q">Your name</h2>
+    <input type="text" id="nm" maxlength="20" placeholder="Yuki" autocomplete="off"><div id="nErr"></div>
+    <div class="row" style="margin-top:14px"><button class="btn" id="back">Back</button><button class="btn pri" id="next">Next</button></div>`;
+    const n=$("nm");n.value=flow.name;n.focus();
+    const go=()=>{const x=n.value.trim();if(!x){$("nErr").innerHTML=`<div class="err">Enter your name first</div>`;return}flow.name=x;store.set("mk_name",x);flow.step=flow.role==="host"?"station":"code";render()};
+    n.oninput=()=>$("nErr").innerHTML="";n.onkeydown=e=>{if(e.key==="Enter")go()};
+    $("next").onclick=go;$("back").onclick=()=>{flow.step="start";render()};
+  }else if(flow.step==="code"){
+    v.innerHTML=`<div class="stepk">Joining as ${esc(flow.name)}</div><h2 class="q">Enter room code</h2>
+    <input type="text" id="cd" maxlength="8" placeholder="K7QX9P2M" autocapitalize="characters" autocomplete="off" style="font-size:22px;letter-spacing:.15em;text-transform:uppercase"><div id="cErr"></div>
+    <div class="row" style="margin-top:14px"><button class="btn" id="back">Back</button><button class="btn pri" id="next">Next</button></div>`;
+    const c=$("cd");c.value=flow.code;c.focus();
+    const go=async()=>{const x=c.value.trim().toUpperCase();const er=m=>$("cErr").innerHTML=`<div class="err">${m}</div>`;
+      if(!/^[A-Z2-9]{8}$/.test(x))return er("Room codes are 8 letters and numbers");
+      $("next").disabled=true;
+      try{const h=await history(x);if(!h.length){$("next").disabled=false;return er("No room with that code. Rooms last about 12 hours.")}flow.code=x;flow.step="station";render()}
+      catch(e){$("next").disabled=false;er("Couldn't check the code. Check your connection.")}};
+    c.oninput=()=>$("cErr").innerHTML="";c.onkeydown=e=>{if(e.key==="Enter")go()};
+    $("next").onclick=go;$("back").onclick=()=>{flow.step="name";render()};
+  }else if(flow.step==="station"){
+    v.innerHTML=`<div class="stepk">${flow.role==="host"?"Hosting":"Joining room "+esc(flow.code)} as ${esc(flow.name)}</div><h2 class="q">Where are you coming from?</h2><div id="pk"></div>
+    <button class="btn" id="back" style="width:100%;margin-top:8px">Back</button>`;
+    picker($("pk"),{okLabel:flow.role==="host"?"Create room":"Join room",onDone:async p=>{
+      const me={id:uid(),name:flow.name,g:p.g,watch:p.watch,extra:p.extra};
+      if(flow.role==="host")await enterRoom(newCode(),{create:true,me});else await enterRoom(flow.code,{me});
+    }});
+    $("back").onclick=()=>{flow.step=flow.role==="host"?"name":"code";render()};
+  }else renderRoom();
 }
-async function cycleExtra(i){
-  const p=members()[i];const nx=EXTRAS[(EXTRAS.indexOf(p.extra||0)+1)%EXTRAS.length];
-  if(room){try{await db.doc(`rooms/${room}/members/${p.id}`).update({extra:nx})}catch(e){roomMsg("Couldn't change that in the room.")}}
-  else{p.extra=nx;save();renderAll()}
+
+function renderRoom(){
+  const v=$("view");
+  if(!$("roomView")){
+    v.innerHTML=`<div id="roomView"><div class="roomhead"><div><div class="ps">Room code · <span id="live">Live</span></div><div class="code">${esc(room)}</div></div><button class="btn" id="share">Share</button></div>
+    <div class="ps" id="shareMsg" style="min-height:20px"></div>
+    <div class="lbl">Meeting for</div><div class="chips" id="purpose"></div>
+    <div class="lbl">Fair by</div><div class="chips" id="mode"></div>
+    <h2 id="grpTitle"></h2><div id="people"></div>
+    <div id="addWrap"></div>
+    <h2>Best places to meet</h2><div id="results"></div>
+    <button class="btn" id="leave" style="width:100%;margin-top:20px">Leave room</button></div>`;
+    $("share").onclick=shareRoom;$("leave").onclick=leave;renderAdd(false);
+  }
+  chips("purpose",PURPOSES,"purpose");chips("mode",MODES,"mode");
+  const ms=members();
+  $("grpTitle").textContent=`${ms.length} in the room`;
+  $("people").innerHTML=ms.map((p,i)=>{
+    const g=D.groups[p.g],ci=counted().indexOf(p),c=ci<0?"var(--mut)":COLORS[ci%COLORS.length],ex=p.extra||0;
+    const sub=p.watch?"View only · not counted":`${esc(g[0])} · ${esc(g[1])}`;
+    return `<div class="person"><span class="dot" style="color:${c};background:${p.watch?"transparent":c}"></span><div><div class="pn">${esc(p.name)}${p.id===myId?' <span class="you">you</span>':""}${p.watch?' <span class="badge" style="background:var(--card);color:var(--mut)">View only</span>':""}</div><div class="ps">${sub}</div></div>${p.watch?"":`<button class="plus${ex?" on":""}" data-p="${i}" aria-label="Extra minutes for ${esc(p.name)}">+${ex} min</button>`}<button class="x" data-i="${i}" aria-label="Remove ${esc(p.name)}">×</button></div>`}).join("");
+  $("people").onclick=async e=>{
+    const pb=e.target.closest(".plus"),xb=e.target.closest(".x");
+    try{
+      if(pb){const p=ms[+pb.dataset.p];const nx=EXTRAS[(EXTRAS.indexOf(p.extra||0)+1)%EXTRAS.length];p.extra=nx;renderRoom();await publish({type:"member",id:p.id,name:p.name,g:p.g,watch:p.watch,extra:nx})}
+      if(xb){const p=ms[+xb.dataset.i];roomMembers=roomMembers.filter(x=>x!==p);renderRoom();await publish({type:"remove",id:p.id})}
+    }catch(err){$("shareMsg").textContent="Couldn't send that change. Check your connection."}
+  };
+  renderResults();
 }
-async function removePerson(i){
-  if(room){const m=roomMembers[i];try{await db.doc(`rooms/${room}/members/${m.id}`).delete()}catch(e){roomMsg("Couldn't remove from the room.")}}
-  else{st.people.splice(i,1);save();renderAll()}
+function chips(id,obj,key){
+  const el=$(id);
+  el.innerHTML=Object.entries(obj).map(([k,v])=>`<button class="chip" data-k="${k}" aria-pressed="${st[key]===k}">${esc(Array.isArray(v)?v[0]:v)}</button>`).join("");
+  el.onclick=async e=>{const b=e.target.closest("button");if(!b)return;st[key]=b.dataset.k;renderRoom();try{await publish({type:"meta",purpose:st.purpose,mode:st.mode})}catch(err){}};
+}
+function renderAdd(open){
+  const w=$("addWrap");
+  if(!open){w.innerHTML=`<button class="btn" id="addBtn" style="width:100%;margin-top:10px">+ Add someone without a phone</button>`;$("addBtn").onclick=()=>renderAdd(true);return}
+  w.innerHTML=`<div class="form" id="addForm"></div>`;
+  picker($("addForm"),{askName:true,okLabel:"Add",onCancel:()=>renderAdd(false),onDone:async p=>{
+    const m={id:uid(),name:p.name,g:p.g,watch:p.watch,extra:p.extra,t:Date.now()};
+    await publish({type:"member",...m});apply({type:"member",...m});renderAdd(false);renderRoom();
+  }});
+}
+async function shareRoom(){
+  const url=location.href.split("#")[0];
+  const text=`Join my Mannaka meetup! Room code: ${room}\n${url}`;
+  try{if(navigator.share){await navigator.share({text});return}}catch(e){if(e.name==="AbortError")return}
+  try{await navigator.clipboard.writeText(text);$("shareMsg").textContent="Copied the invite. Paste it into LINE."}
+  catch(e){$("shareMsg").textContent="Send this code to your friends: "+room}
 }
 
 /* ---------- routing ---------- */
@@ -254,7 +340,7 @@ function drawConv(r){
       h+=`<circle cx="${lx}" cy="${y}" r="6" fill="var(--bg)" stroke="${c}" stroke-width="3"/>`;
       h+=`<text x="${lx-12}" y="${y-3}" text-anchor="end" font-size="14" font-weight="600" fill="currentColor">${esc(p.name.slice(0,10))}</text>`;
       h+=`<text x="${lx-12}" y="${y+13}" text-anchor="end" font-size="12" fill="var(--mut)">${esc(D.groups[p.g][0].slice(0,7))}</text>`;
-      h+=`<text x="${lx+14}" y="${y-8}" font-size="12.5" font-weight="600" fill="currentColor">${Math.round(r.t[i])} min${p.extra?` (incl. +${p.extra})`:""} · ~¥${r.f[i]}</text>`;
+      h+=`<text x="${lx+14}" y="${y-8}" font-size="12.5" font-weight="600" fill="currentColor">${Math.round(r.t[i])} min${p.extra?` (+${p.extra})`:""} · ~¥${r.f[i]}</text>`;
     });
     h+=`<circle cx="${cx}" cy="${cy}" r="16" fill="var(--bg)" stroke="var(--ink)" stroke-width="5"/>`;
     s.innerHTML=h;s.style.color="var(--ink)";
@@ -262,65 +348,20 @@ function drawConv(r){
   convRO=new ResizeObserver(draw);convRO.observe(s);draw();
 }
 
-/* ---------- rooms ---------- */
-function roomMsg(m){const e=document.getElementById("roomMsg");if(e)e.textContent=m}
-function renderRoom(){
-  const el=document.getElementById("room");
-  if(!db){el.innerHTML=`<div style="font-weight:600">Invite friends</div><div class="ps" style="margin-top:4px">Shared rooms need you to be signed in to Claude. For now, add everyone on this phone.</div>`;return}
-  if(room){el.innerHTML=`<div class="ps">Room code</div><div class="code">${esc(room)}</div><div class="ps" style="margin:6px 0 10px">Friends open this app, tap “Join room” and enter the code. They can add their station, or join as view only. Everyone sees updates live.</div><div class="row"><button class="btn" id="copyCode">Copy code</button><button class="btn" id="leave">Leave room</button></div><div class="err" id="roomMsg"></div>`;
-    document.getElementById("copyCode").onclick=async()=>{try{await navigator.clipboard.writeText(room);roomMsg("Copied")}catch(e){roomMsg("Copy didn't work here. The code is "+room)}};
-    document.getElementById("leave").onclick=leaveRoom;return}
-  el.innerHTML=`<div style="font-weight:600">Invite friends</div><div class="ps" style="margin:4px 0 10px">Make a room and share the code. Each friend adds their own name and station.</div>
-  <div class="row"><button class="btn pri" id="mk">Make a room</button></div>
-  <div class="row" style="margin-top:8px"><input type="text" id="jc" maxlength="6" placeholder="Room code" autocapitalize="characters" style="flex:2"><button class="btn" id="jn">Join room</button></div><div class="err" id="roomMsg"></div>`;
-  document.getElementById("mk").onclick=makeRoom;
-  document.getElementById("jn").onclick=()=>joinRoom(document.getElementById("jc").value.trim().toUpperCase());
-}
-async function makeRoom(){
-  const code=Array.from({length:6},()=>"ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.floor(Math.random()*32)]).join("");
-  try{
-    await db.doc(`rooms/${code}`).set({purpose:st.purpose,mode:st.mode,created:Date.now()});
-    for(const p of st.people){const id=Math.random().toString(36).slice(2,10);await db.doc(`rooms/${code}/members/${id}`).set({name:p.name,g:p.watch?-1:p.g,watch:!!p.watch,extra:p.extra||0,t:Date.now()})}
-    openRoom(code);
-  }catch(e){roomMsg("Couldn't make a room. Ask the owner for Contributor access.")}
-}
-async function joinRoom(code){
-  if(!/^[A-Z2-9]{6}$/.test(code)){roomMsg("Enter the 6-character code");return}
-  try{const s=await db.doc(`rooms/${code}`).get();if(!s.exists){roomMsg("No room with that code");return}openRoom(code)}catch(e){roomMsg("Couldn't reach the room. Try again.")}
-}
-function openRoom(code){
-  room=code;roomMembers=[];store.set("room",code);
-  let timer=setTimeout(()=>roomMsg("Room is slow to load…"),10000);
-  unsubR=db.doc(`rooms/${code}`).onSnapshot(s=>{const d=s.data();if(d){if(PURPOSES[d.purpose])st.purpose=d.purpose;if(MODES[d.mode])st.mode=d.mode;renderAll()}},()=>{});
-  unsubM=db.collection(`rooms/${code}/members`).orderBy("t").onSnapshot(s=>{
-    clearTimeout(timer);
-    roomMembers=s.docs.map(d=>({id:d.id,...d.data()})).filter(m=>typeof m.name==="string"&&(m.watch===true||(Number.isInteger(m.g)&&D.groups[m.g]))).map(m=>({id:m.id,name:m.name.slice(0,20),g:m.watch===true?-1:m.g,watch:m.watch===true,extra:Number.isFinite(m.extra)?Math.max(0,Math.min(120,Math.round(m.extra))):0}));
-    renderAll();
-  },()=>{clearTimeout(timer);roomMsg("Lost the room connection.")});
-  renderAll();
-}
-function leaveRoom(){if(unsubM)unsubM();if(unsubR)unsubR();room=null;roomMembers=null;store.set("room",null);renderAll()}
-let metaBusy=false;
-async function pushMeta(){if(metaBusy||!room)return;metaBusy=true;try{await db.doc(`rooms/${room}`).update({purpose:st.purpose,mode:st.mode})}catch(e){}metaBusy=false}
 
-function renderAll(){chips("purpose",PURPOSES,"purpose");chips("mode",MODES,"mode");renderPeople();if(!adding)renderAdd();renderRoom();renderResults()}
 
 /* ---------- boot ---------- */
+$("ver").textContent=VERSION;
 fetch("rail.json").then(r=>r.json()).then(data=>{
   D=data;
   const N=D.nodeGroup.length;adj=Array.from({length:N},()=>[]);
   D.edges.forEach(([a,b,t,,],i)=>{adj[a].push([b,t,i]);adj[b].push([a,t,i])});
   groupNodes=Array.from({length:D.groups.length},()=>[]);D.nodeGroup.forEach((g,n)=>groupNodes[g].push(n));
   searchIdx=D.groups.map(g=>[g[0],norm(g[1])]);
-  if(!st.people){
-    const f=n=>D.groups.findIndex(g=>g[0]===n);
-    st.people=[{name:"You",g:f("吉祥寺")},{name:"Aki",g:f("北千住")},{name:"Ken",g:f("横浜")}].filter(p=>p.g>=0);save();
-  }
-  st.people=st.people.filter(p=>p.watch||D.groups[p.g]);
-  renderAll();
-  let tries=0;const tryDb=()=>{if(window.claude&&window.claude.use){window.claude.use("db").then(x=>{db=x;if(db){const r=store.get("room",null);if(r)joinRoom(r);else renderRoom()}}).catch(()=>{})}else if(++tries<20)setTimeout(tryDb,250)};tryDb();
-}).catch(()=>{document.getElementById("results").innerHTML=`<p class="empty">Couldn't load station data. Reload to try again.</p>`});
+  render();
+}).catch(()=>{$("view").innerHTML=`<p class="empty">Couldn't load station data. Reload to try again.</p>`});
 }
+
 </script>
 </body>
 </html>
