@@ -93,7 +93,7 @@ h1{white-space:nowrap}.topbar{flex-wrap:wrap}.topbar .chips{flex-wrap:nowrap;gap
 </div>
 <script>
 {
-const VERSION="V0.1.010";
+const VERSION="V0.1.011";
 const COLORS=["#ee5a24","#0079c2","#9b7cb6","#00a7db","#e85298","#6cbb5a","#b5a110","#8f2b2b"];
 const GREY="#9aa0a6";
 const PURPOSES={dinner:["Dinner","ディナー","restaurants","レストラン"],cafe:["Café","カフェ","cafe","カフェ"],drinks:["Drinks","飲み","bar","居酒屋"],parking:["Parking","駐車場","parking","駐車場"],meet:["Just meet","待ち合わせ","",""]};
@@ -142,6 +142,7 @@ const nLines=n=>LANG==="ja"?`${n}路線`:`${n} ${n>1?T.lines[0]:T.line[0]}`;
 const mins=m=>LANG==="ja"?`${m}分`:`${m} min`;
 
 let D=null,adj=null,groupNodes=null,searchIdx=null;
+const linkCode=(()=>{try{const c=(new URLSearchParams(location.search).get("r")||"").toUpperCase();return /^[A-Z2-9]{8}$/.test(c)?c:""}catch(e){return ""}})();
 let st={purpose:"dinner",mode:"time"};
 let flow={step:"start",role:null,name:store.get("mk_name",""),code:""};
 let room=null,roomMembers=[],votes={},es=null,myId=null,editing=null;
@@ -242,13 +243,15 @@ function render(){
     $("goJoin").onclick=()=>{flow.role="join";flow.step="name";render()};
     if(saved)$("goBack").onclick=async()=>{try{myId=saved.myId;await enterRoom(saved.code)}catch(e){$("sErr").innerHTML=`<div class="err">${t("cantReach")}</div>`}};
   }else if(flow.step==="name"){
-    v.innerHTML=`<div class="stepk">${t(flow.role==="host"?"hosting":"joining")}</div><h2 class="q">${t("yourName")}</h2>
+    v.innerHTML=`<div class="stepk">${flow.role==="host"?t("hosting"):t("joining")+(flow.code?" "+esc(flow.code):"")}</div><h2 class="q">${t("yourName")}</h2>
     <input type="text" id="nm" maxlength="20" placeholder="Yuki" autocomplete="off"><div id="nErr"></div>
     <div class="row" style="margin-top:14px"><button class="btn" id="back">${t("back")}</button><button class="btn pri" id="next">${t("next")}</button></div>`;
     const n=$("nm");n.value=flow.name;n.focus();
-    const go=()=>{const x=n.value.trim();if(!x){$("nErr").innerHTML=`<div class="err">${t("nameFirst")}</div>`;return}flow.name=x;store.set("mk_name",x);flow.step=flow.role==="host"?"station":"code";render()};
+    const go=async()=>{const x=n.value.trim();if(!x){$("nErr").innerHTML=`<div class="err">${t("nameFirst")}</div>`;return}flow.name=x;store.set("mk_name",x);
+      if(flow.role==="join"&&flow.code){$("next").disabled=true;try{const h=await history(flow.code);if(!h.length){$("next").disabled=false;$("nErr").innerHTML=`<div class="err">${t("noRoom")}</div>`;return}}catch(e){$("next").disabled=false;$("nErr").innerHTML=`<div class="err">${t("cantCheck")}</div>`;return}flow.step="station";render();return}
+      flow.step=flow.role==="host"?"station":"code";render()};
     n.oninput=()=>$("nErr").innerHTML="";n.onkeydown=e=>{if(e.key==="Enter")go()};
-    $("next").onclick=go;$("back").onclick=()=>{flow.step="start";render()};
+    $("next").onclick=go;$("back").onclick=()=>{flow.step="start";flow.code="";render()};
   }else if(flow.step==="code"){
     v.innerHTML=`<div class="stepk">${t("joiningAs")} ${esc(flow.name)}</div><h2 class="q">${t("enterCode")}</h2>
     <input type="text" id="cd" maxlength="8" placeholder="K7QX9P2M" autocapitalize="characters" autocomplete="off" style="font-size:22px;letter-spacing:.15em;text-transform:uppercase"><div id="cErr"></div>
@@ -268,7 +271,7 @@ function render(){
       const me={id:uid(),name:flow.name,g:p.g,watch:p.watch,extra:p.extra};
       if(flow.role==="host")await enterRoom(newCode(),{create:true,me});else await enterRoom(flow.code,{me});
     }});
-    $("back").onclick=()=>{flow.step=flow.role==="host"?"name":"code";render()};
+    $("back").onclick=()=>{flow.step=flow.role==="host"||linkCode?"name":"code";render()};
   }else renderRoom();
 }
 
@@ -323,7 +326,7 @@ function renderAdd(open){
   }});
 }
 async function shareRoom(){
-  const url=location.href.split("#")[0];
+  const url=location.origin+location.pathname+"?r="+room;
   const text=`${t("invite")} ${room}\n${url}`;
   try{if(navigator.share){await navigator.share({text});return}}catch(e){if(e.name==="AbortError")return}
   try{await navigator.clipboard.writeText(text);$("shareMsg").textContent=t("copied")}
@@ -455,6 +458,7 @@ fetch("rail.json").then(r=>r.json()).then(data=>{
   D.edges.forEach(([a,b,tt,,],i)=>{adj[a].push([b,tt,i]);adj[b].push([a,tt,i])});
   groupNodes=Array.from({length:D.groups.length},()=>[]);D.nodeGroup.forEach((g,n)=>groupNodes[g].push(n));
   searchIdx=D.groups.map(g=>[g[0],norm(g[1])]);
+  if(linkCode){const saved=store.get("mk_room",null);if(saved&&saved.code===linkCode&&saved.myId){myId=saved.myId;enterRoom(linkCode).catch(()=>{flow={step:"name",role:"join",name:flow.name,code:linkCode};render()});return}flow.role="join";flow.code=linkCode;flow.step="name"}
   render();
 }).catch(()=>{$("view").innerHTML=`<p class="empty">Couldn't load station data. Reload to try again.</p>`});
 }
