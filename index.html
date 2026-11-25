@@ -93,7 +93,7 @@ h1{white-space:nowrap}.topbar{flex-wrap:wrap}.topbar .chips{flex-wrap:nowrap;gap
 </div>
 <script>
 {
-const VERSION="V0.1.011";
+const VERSION="V0.1.012";
 const COLORS=["#ee5a24","#0079c2","#9b7cb6","#00a7db","#e85298","#6cbb5a","#b5a110","#8f2b2b"];
 const GREY="#9aa0a6";
 const PURPOSES={dinner:["Dinner","ディナー","restaurants","レストラン"],cafe:["Café","カフェ","cafe","カフェ"],drinks:["Drinks","飲み","bar","居酒屋"],parking:["Parking","駐車場","parking","駐車場"],meet:["Just meet","待ち合わせ","",""]};
@@ -131,7 +131,7 @@ const T={
  noneFound:["No connected station found.","つながる駅が見つかりませんでした。"],
  copied:["Copied the invite. Paste it into LINE.","招待をコピーしました。LINEに貼り付けてください。"],sendCode:["Send this code to your friends:","このコードを友だちに送ってください："],
  invite:["Join my Mannaka meetup! Room code:","Mannakaの集まりに参加してね！ルームコード："],
- edit:["Edit","編集"],cheapest:["Cheapest total","合計最安"],shortest:["Shortest total","合計最短"],total:["Total","合計"],longest:["longest","最長"],selected:["Selected","選択中"],tapToCompare:["Tick a station to see it in the graphic","駅にチェックを入れると図に表示されます"],copy:["Copy","コピー"],codeCopied:["Room code copied","ルームコードをコピーしました"],loading:["Loading station data…","駅データを読み込み中…"],
+ edit:["Edit","編集"],manualCopy:["This browser blocks copying. Select the text below and copy it (Ctrl+C / long-press).","このブラウザではコピーできません。下の文字を選んでコピーしてください（Ctrl+C または長押し）。"],cheapest:["Cheapest total","合計最安"],shortest:["Shortest total","合計最短"],total:["Total","合計"],longest:["longest","最長"],selected:["Selected","選択中"],tapToCompare:["Tick a station to see it in the graphic","駅にチェックを入れると図に表示されます"],copy:["Copy","コピー"],codeCopied:["Room code copied","ルームコードをコピーしました"],loading:["Loading station data…","駅データを読み込み中…"],
  note:["Prototype. About 1,570 Tokyo-area stations. Travel times are estimates from station positions and line speeds, so they can be off by around 20–30%; fares are rough. Rooms use the free ntfy.sh relay: only names, stations and votes are sent, and rooms last about 12 hours. Station data: 国土数値情報 (MLIT).","試作版。首都圏の約1,570駅に対応。所要時間は駅の位置と路線の速度からの推定で、20〜30%ほどずれることがあります。運賃も概算です。ルームは無料の ntfy.sh を使い、送信するのは名前・駅・投票のみ。ルームは約12時間で終了します。駅データ：国土数値情報（国土交通省）"]
 };
 const t=k=>{const v=T[k];if(!v)return k;return LANG==="ja"?v[1]:LANG==="both"?(v[0]===v[1]?v[0]:v[0]+" · "+v[1]):v[0]};
@@ -286,7 +286,7 @@ function renderRoom(){
     <div id="addWrap"></div>
     <h2>${t("best")}</h2><div id="results"></div>
     <button class="btn" id="leave" style="width:100%;margin-top:20px">${t("leave")}</button></div>`;
-    $("share").onclick=shareRoom;$("copy").onclick=async()=>{try{await navigator.clipboard.writeText(room);$("shareMsg").textContent=t("codeCopied")}catch(e){$("shareMsg").textContent=t("sendCode")+" "+room}};$("leave").onclick=leave;renderAdd(false);
+    $("share").onclick=shareRoom;$("copy").onclick=async()=>{if(await copyText(room))$("shareMsg").textContent=t("codeCopied");else manualCopy(room)};$("leave").onclick=leave;renderAdd(false);
   }
   chips("purpose",PURPOSES,"purpose");chips("mode",MODES,"mode");
   const ms=members();
@@ -329,8 +329,19 @@ async function shareRoom(){
   const url=location.origin+location.pathname+"?r="+room;
   const text=`${t("invite")} ${room}\n${url}`;
   try{if(navigator.share){await navigator.share({text});return}}catch(e){if(e.name==="AbortError")return}
-  try{await navigator.clipboard.writeText(text);$("shareMsg").textContent=t("copied")}
-  catch(e){$("shareMsg").textContent=t("sendCode")+" "+room}
+  if(await copyText(text))$("shareMsg").textContent=t("copied");else manualCopy(url);
+}
+function legacyCopy(text){
+  const ta=document.createElement("textarea");ta.value=text;ta.setAttribute("readonly","");ta.style.cssText="position:absolute;left:-9999px;top:0;opacity:0";
+  document.body.appendChild(ta);ta.select();ta.setSelectionRange(0,text.length);let ok=false;try{ok=document.execCommand("copy")}catch(e){}ta.remove();return ok;
+}
+async function copyText(text){
+  try{if(navigator.clipboard&&navigator.clipboard.writeText){await navigator.clipboard.writeText(text);return true}}catch(e){}
+  return legacyCopy(text);
+}
+function manualCopy(text){
+  const m=$("shareMsg");m.innerHTML=`<div>${esc(t("manualCopy"))}</div><input type="text" readonly id="manualBox" style="margin-top:6px;font-size:15px">`;
+  const box=$("manualBox");box.value=text;box.focus();box.select();box.onclick=()=>box.select();
 }
 
 function heap(){const h=[];return{push(d,n){h.push([d,n]);let i=h.length-1;while(i>0){const p=(i-1)>>1;if(h[p][0]<=h[i][0])break;[h[p],h[i]]=[h[i],h[p]];i=p}},pop(){const t=h[0],l=h.pop();if(h.length){h[0]=l;let i=0;for(;;){let a=2*i+1,b=a+1,m=i;if(a<h.length&&h[a][0]<h[m][0])m=a;if(b<h.length&&h[b][0]<h[m][0])m=b;if(m===i)break;[h[m],h[i]]=[h[i],h[m]];i=m}}return t},get size(){return h.length}}}
