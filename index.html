@@ -79,6 +79,7 @@ h2.q{font-size:24px;margin:4px 0 14px}
 .pn{display:flex;align-items:center;flex-wrap:wrap;gap:4px 6px}.acts{display:inline-flex;align-items:center;gap:2px;margin-left:4px}.acts .plus{margin-left:0;min-height:30px;padding:0 9px}.acts .ed,.acts .x{min-width:34px;min-height:34px;margin:0;font-size:16px}
 .hero .toprow{display:flex;justify-content:space-between;align-items:center}.hero .toprow .voterow{margin-top:0}
 h1{white-space:nowrap}.topbar{flex-wrap:wrap}.topbar .chips{flex-wrap:nowrap;gap:4px}.btn{white-space:nowrap}
+.roomhead{display:flex!important;flex-direction:column;align-items:center;text-align:center;gap:6px;background:var(--card);border-radius:16px;padding:14px 12px 8px}.roomhead .code{font-size:32px}.sharebtn{display:inline-flex;align-items:center;gap:8px;background:var(--acc);border-color:var(--acc);color:#fff;padding:0 22px}
 .chip.sm{min-height:30px;padding:0 8px;font-size:12px}
 .topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
 .st small{font-size:13px}
@@ -93,7 +94,7 @@ h1{white-space:nowrap}.topbar{flex-wrap:wrap}.topbar .chips{flex-wrap:nowrap;gap
 </div>
 <script>
 {
-const VERSION="V0.1.012";
+const VERSION="V0.1.013";
 const COLORS=["#ee5a24","#0079c2","#9b7cb6","#00a7db","#e85298","#6cbb5a","#b5a110","#8f2b2b"];
 const GREY="#9aa0a6";
 const PURPOSES={dinner:["Dinner","ディナー","restaurants","レストラン"],cafe:["Café","カフェ","cafe","カフェ"],drinks:["Drinks","飲み","bar","居酒屋"],parking:["Parking","駐車場","parking","駐車場"],meet:["Just meet","待ち合わせ","",""]};
@@ -278,15 +279,15 @@ function render(){
 function renderRoom(){
   const v=$("view");
   if(!$("roomView")){
-    v.innerHTML=`<div id="roomView"><div class="roomhead"><div><div class="ps">${t("roomCode")} · <span id="live">${t("live")}</span></div><div class="code">${esc(room)}</div></div><div class="row" style="flex:none;gap:6px"><button class="btn" id="copy">${t("copy")}</button><button class="btn" id="share">${t("share")}</button></div></div>
-    <div class="ps" id="shareMsg" style="min-height:20px"></div>
+    v.innerHTML=`<div id="roomView"><div class="roomhead"><div class="ps">${t("roomCode")} · <span id="live">${t("live")}</span></div><div class="code">${esc(room)}</div><button class="btn sharebtn" id="share"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M5 12v7h14v-7"/></svg>${t("share")}</button>
+    <div class="ps" id="shareMsg" style="min-height:20px"></div></div>
     <div class="lbl">${t("meetingFor")}</div><div class="chips" id="purpose"></div>
     <div class="lbl">${t("fairBy")}</div><div class="chips" id="mode"></div>
     <h2 id="grpTitle"></h2><div id="people"></div>
     <div id="addWrap"></div>
     <h2>${t("best")}</h2><div id="results"></div>
     <button class="btn" id="leave" style="width:100%;margin-top:20px">${t("leave")}</button></div>`;
-    $("share").onclick=shareRoom;$("copy").onclick=async()=>{if(await copyText(room))$("shareMsg").textContent=t("codeCopied");else manualCopy(room)};$("leave").onclick=leave;renderAdd(false);
+    $("share").onclick=shareRoom;$("leave").onclick=leave;renderAdd(false);
   }
   chips("purpose",PURPOSES,"purpose");chips("mode",MODES,"mode");
   const ms=members();
